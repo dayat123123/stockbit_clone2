@@ -10,6 +10,10 @@ enum AppNavTab {
     label: 'Layout',
     icon: Icons.dashboard_customize_outlined,
   ),
+  order(
+    label: 'Order',
+    icon: Icons.receipt_long_outlined,
+  ),
   portfolio(
     label: 'Portfolio',
     icon: Icons.account_balance_wallet_outlined,

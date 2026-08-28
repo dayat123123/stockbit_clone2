@@ -2,15 +2,31 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:stockbit_clone2/core/workspace/models/workspace_window_model.dart';
 
-/// Helper utility providing smooth magnetic snapping calculations for workspace windows
-/// during both movement (drag-and-drop) and resizing.
+/// Intelligent Neighbor-Aware Magnetic Snapping for workspace windows.
+///
+/// Features:
+/// - Verifies spatial 2D projection/overlap before snapping (prevents false snaps to distant windows).
+/// - Automatically aligns flush edges (top/bottom when side-by-side, left/right when stacked).
+/// - 24px comfortable snap radius so windows attract naturally without needing to squish/himpit them.
 class MagneticSnapHelper {
-  static const double snapThreshold = 16.0;
+  static const double snapThreshold = 24.0;
   static const double edgeSpacing = 4.0;
-  static const double minWidth = 180.0;
-  static const double minHeight = 140.0;
-  static const double maxWidth = 1600.0;
-  static const double maxHeight = 1600.0;
+  static const double minWidth = 200.0;
+  static const double minHeight = 160.0;
+  static const double maxWidth = 1920.0;
+  static const double maxHeight = 1920.0;
+
+  /// Helper to check if two intervals overlap or are within snap proximity
+  static bool _intervalsOverlapOrNear(
+    double start1,
+    double length1,
+    double start2,
+    double length2,
+  ) {
+    final overlapStart = max(start1, start2);
+    final overlapEnd = min(start1 + length1, start2 + length2);
+    return (overlapEnd - overlapStart) >= -snapThreshold;
+  }
 
   /// Computes the magnetically snapped position for a moving window.
   static Offset calculateSnap({
@@ -27,81 +43,97 @@ class MagneticSnapHelper {
     final windowW = windowSize.width;
     final windowH = windowSize.height;
 
-    // ── 1. Canvas Boundary Snapping ──────────────────────────────────────────
-    // Left boundary
-    if ((newX - edgeSpacing).abs() < snapThreshold) {
-      newX = edgeSpacing;
-    }
-    // Right boundary
-    final rightEdge = canvasSize.width - edgeSpacing;
-    if ((newX + windowW - rightEdge).abs() < snapThreshold) {
-      newX = rightEdge - windowW;
-    }
-    // Top boundary
-    if ((newY - edgeSpacing).abs() < snapThreshold) {
-      newY = edgeSpacing;
-    }
-    // Bottom boundary (if not scrollable)
-    if (!isScrollable) {
-      final bottomEdge = canvasSize.height - edgeSpacing;
-      if ((newY + windowH - bottomEdge).abs() < snapThreshold) {
-        newY = bottomEdge - windowH;
-      }
-    }
-
-    // ── 2. Inter-Window Magnetic Snapping ────────────────────────────────────
+    // ── 1. Inter-Window Magnetic Snapping (Neighbor-Aware) ───────────────────
     for (final other in otherWindows) {
       if (other.id == activeWindowId) continue;
 
       final otherL = other.position.dx;
       final otherT = other.position.dy;
-      final otherR = other.position.dx + other.size.width;
-      final otherB = other.position.dy + other.size.height;
+      final otherW = other.size.width;
+      final otherH = other.size.height;
+      final otherR = otherL + otherW;
+      final otherB = otherT + otherH;
 
-      // X-Axis Snapping:
-      // a) Snap to other window's right edge
-      if ((newX - (otherR + edgeSpacing)).abs() < snapThreshold) {
-        newX = otherR + edgeSpacing;
-      }
-      // b) Snap to other window's left edge (flush)
-      else if ((newX - otherL).abs() < snapThreshold) {
-        newX = otherL;
-      }
-      // c) Snap right edge to other window's left edge
-      else if ((newX + windowW - (otherL - edgeSpacing)).abs() <
-          snapThreshold) {
-        newX = otherL - edgeSpacing - windowW;
-      }
-      // d) Snap right edge to other window's right edge (flush)
-      else if ((newX + windowW - otherR).abs() < snapThreshold) {
-        newX = otherR - windowW;
+      // Check if windows are on the same vertical span (Side-by-Side candidates)
+      if (_intervalsOverlapOrNear(newY, windowH, otherT, otherH)) {
+        // a) Snap left edge to neighbor's right edge (+ spacing)
+        if ((newX - (otherR + edgeSpacing)).abs() < snapThreshold) {
+          newX = otherR + edgeSpacing;
+        }
+        // b) Snap right edge to neighbor's left edge (- spacing)
+        else if ((newX + windowW - (otherL - edgeSpacing)).abs() < snapThreshold) {
+          newX = otherL - edgeSpacing - windowW;
+        }
+        // c) Snap left edge flush with neighbor's left edge
+        else if ((newX - otherL).abs() < snapThreshold) {
+          newX = otherL;
+        }
+        // d) Snap right edge flush with neighbor's right edge
+        else if ((newX + windowW - otherR).abs() < snapThreshold) {
+          newX = otherR - windowW;
+        }
+
+        // Also align vertical top / bottom edges flush if close
+        if ((newY - otherT).abs() < snapThreshold) {
+          newY = otherT;
+        } else if ((newY + windowH - otherB).abs() < snapThreshold) {
+          newY = otherB - windowH;
+        }
       }
 
-      // Y-Axis Snapping:
-      // a) Snap to other window's bottom edge
-      if ((newY - (otherB + edgeSpacing)).abs() < snapThreshold) {
-        newY = otherB + edgeSpacing;
+      // Check if windows are on the same horizontal span (Stacked candidates)
+      if (_intervalsOverlapOrNear(newX, windowW, otherL, otherW)) {
+        // a) Snap top edge to neighbor's bottom edge (+ spacing)
+        if ((newY - (otherB + edgeSpacing)).abs() < snapThreshold) {
+          newY = otherB + edgeSpacing;
+        }
+        // b) Snap bottom edge to neighbor's top edge (- spacing)
+        else if ((newY + windowH - (otherT - edgeSpacing)).abs() < snapThreshold) {
+          newY = otherT - edgeSpacing - windowH;
+        }
+        // c) Snap top edge flush with neighbor's top edge
+        else if ((newY - otherT).abs() < snapThreshold) {
+          newY = otherT;
+        }
+        // d) Snap bottom edge flush with neighbor's bottom edge
+        else if ((newY + windowH - otherB).abs() < snapThreshold) {
+          newY = otherB - windowH;
+        }
+
+        // Also align horizontal left / right edges flush if close
+        if ((newX - otherL).abs() < snapThreshold) {
+          newX = otherL;
+        } else if ((newX + windowW - otherR).abs() < snapThreshold) {
+          newX = otherR - windowW;
+        }
       }
-      // b) Snap to other window's top edge (flush)
-      else if ((newY - otherT).abs() < snapThreshold) {
-        newY = otherT;
-      }
-      // c) Snap bottom edge to other window's top edge
-      else if ((newY + windowH - (otherT - edgeSpacing)).abs() <
-          snapThreshold) {
-        newY = otherT - edgeSpacing - windowH;
-      }
-      // d) Snap bottom edge to other window's bottom edge (flush)
-      else if ((newY + windowH - otherB).abs() < snapThreshold) {
-        newY = otherB - windowH;
+    }
+
+    // ── 2. Canvas Boundary Snapping ──────────────────────────────────────────
+    // Left boundary
+    if ((newX - edgeSpacing).abs() < snapThreshold || newX < edgeSpacing) {
+      newX = edgeSpacing;
+    }
+    // Right boundary
+    final rightEdge = canvasSize.width - edgeSpacing;
+    if ((newX + windowW - rightEdge).abs() < snapThreshold || (newX + windowW) > rightEdge) {
+      newX = max(edgeSpacing, rightEdge - windowW);
+    }
+    // Top boundary
+    if ((newY - edgeSpacing).abs() < snapThreshold || newY < edgeSpacing) {
+      newY = edgeSpacing;
+    }
+    // Bottom boundary (if not scrollable)
+    if (!isScrollable) {
+      final bottomEdge = canvasSize.height - edgeSpacing;
+      if ((newY + windowH - bottomEdge).abs() < snapThreshold || (newY + windowH) > bottomEdge) {
+        newY = max(edgeSpacing, bottomEdge - windowH);
       }
     }
 
     // ── 3. Clamping ──────────────────────────────────────────────────────────
-    final clampedX = newX
-        .clamp(0.0, max(0.0, canvasSize.width - 60))
-        .toDouble();
-    final maxY = max(0.0, canvasSize.height - 40);
+    final clampedX = newX.clamp(0.0, max(0.0, canvasSize.width - 60)).toDouble();
+    final maxY = isScrollable ? 5000.0 : max(0.0, canvasSize.height - 40);
     final clampedY = newY.clamp(0.0, maxY).toDouble();
 
     return Offset(clampedX, clampedY);
@@ -123,76 +155,68 @@ class MagneticSnapHelper {
     final right = posX + width;
     final bottom = posY + height;
 
-    // ── 1. Right Edge Snapping ───────────────────────────────────────────────
     for (final other in otherWindows) {
       if (other.id == activeWindowId) continue;
       final otherL = other.position.dx;
-      final otherR = other.position.dx + other.size.width;
-
-      // Snap right edge to other's left edge
-      if ((right - (otherL - edgeSpacing)).abs() < snapThreshold) {
-        width = (otherL - edgeSpacing) - posX;
-      }
-      // Snap right edge to other's right edge (flush)
-      else if ((right - otherR).abs() < snapThreshold) {
-        width = otherR - posX;
-      }
-    }
-
-    // ── 2. Bottom Edge Snapping ──────────────────────────────────────────────
-    for (final other in otherWindows) {
-      if (other.id == activeWindowId) continue;
       final otherT = other.position.dy;
-      final otherB = other.position.dy + other.size.height;
+      final otherW = other.size.width;
+      final otherH = other.size.height;
+      final otherR = otherL + otherW;
+      final otherB = otherT + otherH;
 
-      // Snap bottom edge to other's top edge
-      if ((bottom - (otherT - edgeSpacing)).abs() < snapThreshold) {
-        height = (otherT - edgeSpacing) - posY;
+      // 1. Right Edge Snapping (if vertically adjacent)
+      if (_intervalsOverlapOrNear(posY, height, otherT, otherH)) {
+        if ((right - (otherL - edgeSpacing)).abs() < snapThreshold) {
+          width = (otherL - edgeSpacing) - posX;
+        } else if ((right - otherR).abs() < snapThreshold) {
+          width = otherR - posX;
+        }
       }
-      // Snap bottom edge to other's bottom edge (flush)
-      else if ((bottom - otherB).abs() < snapThreshold) {
-        height = otherB - posY;
+
+      // 2. Bottom Edge Snapping (if horizontally adjacent)
+      if (_intervalsOverlapOrNear(posX, width, otherL, otherW)) {
+        if ((bottom - (otherT - edgeSpacing)).abs() < snapThreshold) {
+          height = (otherT - edgeSpacing) - posY;
+        } else if ((bottom - otherB).abs() < snapThreshold) {
+          height = otherB - posY;
+        }
+      }
+
+      // 3. Left Edge Snapping (if vertically adjacent)
+      if (_intervalsOverlapOrNear(posY, height, otherT, otherH)) {
+        if ((posX - (otherR + edgeSpacing)).abs() < snapThreshold) {
+          final delta = (otherR + edgeSpacing) - posX;
+          posX = otherR + edgeSpacing;
+          width -= delta;
+        } else if ((posX - otherL).abs() < snapThreshold) {
+          final delta = otherL - posX;
+          posX = otherL;
+          width -= delta;
+        }
+      }
+
+      // 4. Top Edge Snapping (if horizontally adjacent)
+      if (_intervalsOverlapOrNear(posX, width, otherL, otherW)) {
+        if ((posY - (otherB + edgeSpacing)).abs() < snapThreshold) {
+          final delta = (otherB + edgeSpacing) - posY;
+          posY = otherB + edgeSpacing;
+          height -= delta;
+        } else if ((posY - otherT).abs() < snapThreshold) {
+          final delta = otherT - posY;
+          posY = otherT;
+          height -= delta;
+        }
       }
     }
 
-    // ── 3. Left Edge Snapping ────────────────────────────────────────────────
-    for (final other in otherWindows) {
-      if (other.id == activeWindowId) continue;
-      final otherL = other.position.dx;
-      final otherR = other.position.dx + other.size.width;
-
-      // Snap left edge to other's right edge
-      if ((posX - (otherR + edgeSpacing)).abs() < snapThreshold) {
-        final delta = (otherR + edgeSpacing) - posX;
-        posX = otherR + edgeSpacing;
-        width -= delta;
-      }
-      // Snap left edge to other's left edge (flush)
-      else if ((posX - otherL).abs() < snapThreshold) {
-        final delta = otherL - posX;
-        posX = otherL;
-        width -= delta;
-      }
+    // Canvas Edge Snaps on Resize
+    final canvasRight = canvasSize.width - edgeSpacing;
+    if ((posX + width - canvasRight).abs() < snapThreshold) {
+      width = canvasRight - posX;
     }
-
-    // ── 4. Top Edge Snapping ─────────────────────────────────────────────────
-    for (final other in otherWindows) {
-      if (other.id == activeWindowId) continue;
-      final otherT = other.position.dy;
-      final otherB = other.position.dy + other.size.height;
-
-      // Snap top edge to other's bottom edge
-      if ((posY - (otherB + edgeSpacing)).abs() < snapThreshold) {
-        final delta = (otherB + edgeSpacing) - posY;
-        posY = otherB + edgeSpacing;
-        height -= delta;
-      }
-      // Snap top edge to other's top edge (flush)
-      else if ((posY - otherT).abs() < snapThreshold) {
-        final delta = otherT - posY;
-        posY = otherT;
-        height -= delta;
-      }
+    final canvasBottom = canvasSize.height - edgeSpacing;
+    if ((posY + height - canvasBottom).abs() < snapThreshold) {
+      height = canvasBottom - posY;
     }
 
     return (

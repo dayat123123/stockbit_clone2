@@ -6,7 +6,8 @@ import 'package:stockbit_clone2/core/workspace/bloc/workspace_event.dart';
 import 'package:stockbit_clone2/core/workspace/bloc/workspace_state.dart';
 import 'package:stockbit_clone2/core/workspace/widgets/add_widget_dialog.dart';
 import 'package:stockbit_clone2/features/layout/presentation/widgets/layout_template_gallery_dialog.dart';
-import 'package:stockbit_clone2/features/trade/presentation/widgets/quick_trade_modal.dart';
+import 'package:stockbit_clone2/features/navigation/domain/entities/app_nav_tab.dart';
+import 'package:stockbit_clone2/features/navigation/presentation/cubit/navigation_cubit.dart';
 
 /// Top Workspace Toolbar Header (matching Stockbit Pro Desktop reference design).
 ///
@@ -27,13 +28,11 @@ class DesktopTopHeader extends StatelessWidget {
         int activeTabIndex = 0;
         int gridRows = 2;
         int gridCols = 4;
-        String? activeSymbol;
 
         if (state is WorkspaceLoadedState) {
           activeTabIndex = state.activeTabIndex;
           gridRows = state.gridRows;
           gridCols = state.gridColumns;
-          activeSymbol = state.activeWindow?.symbol;
         }
 
         final tabs = state is WorkspaceLoadedState ? state.tabs : [];
@@ -262,14 +261,34 @@ class DesktopTopHeader extends StatelessWidget {
                             ),
                             itemBuilder: (_) => [
                               _buildPresetItem(
-                                '2 × 4 (8 Slots - Default)',
+                                '2 × 4 (8 Slots - Standard)',
                                 2,
                                 4,
                               ),
-                              _buildPresetItem('2 × 3 (6 Slots)', 2, 3),
-                              _buildPresetItem('2 × 2 (4 Slots)', 2, 2),
-                              _buildPresetItem('1 × 2 (2 Slots)', 1, 2),
-                              _buildPresetItem('3 × 3 (9 Slots)', 3, 3),
+                              _buildPresetItem(
+                                '2 × 3 (6 Slots - Balanced)',
+                                2,
+                                3,
+                              ),
+                              _buildPresetItem('2 × 2 (4 Quad View)', 2, 2),
+                              _buildPresetItem(
+                                '3 × 4 (12 Slots - Compact Desk)',
+                                3,
+                                4,
+                              ),
+                              _buildPresetItem('3 × 3 (9 Slots - Grid)', 3, 3),
+                              _buildPresetItem(
+                                '2 × 5 (10 Slots - Mini Tiles)',
+                                2,
+                                5,
+                              ),
+                              _buildPresetItem(
+                                '1 × 4 (4 Columns Horizontal)',
+                                1,
+                                4,
+                              ),
+                              _buildPresetItem('1 × 3 (3 Columns Focus)', 1, 3),
+                              _buildPresetItem('1 × 2 (2 Split Screen)', 1, 2),
                               _buildPresetItem(
                                 '1 × 1 (Single Max Focus)',
                                 1,
@@ -339,6 +358,54 @@ class DesktopTopHeader extends StatelessWidget {
 
                           const SizedBox(width: 6),
 
+                          // Arrange Windows Button (Neatly arranges positions without resizing)
+                          Tooltip(
+                            message:
+                                'Auto-arrange and tidy up window positions without resizing',
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.cardSurface,
+                                foregroundColor: AppColors.textPrimary,
+                                side: const BorderSide(
+                                  color: AppColors.border,
+                                  width: 0.8,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 0,
+                                ),
+                                minimumSize: const Size(78, 26),
+                                elevation: 0,
+                              ),
+                              onPressed: () {
+                                final mediaSize = MediaQuery.of(context).size;
+                                final availableWidth = mediaSize.width - 68;
+                                final availableHeight =
+                                    mediaSize.height - 38 - 26 - 30;
+                                context.read<WorkspaceBloc>().add(
+                                  AutoArrangeWindowsEvent(
+                                    Size(availableWidth, availableHeight),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(
+                                Icons.auto_awesome_mosaic_outlined,
+                                size: 12,
+                                color: AppColors.primaryGreen,
+                              ),
+                              label: const Text(
+                                'Arrange',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(width: 6),
+
                           // Quick BUY Button
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
@@ -355,10 +422,8 @@ class DesktopTopHeader extends StatelessWidget {
                               elevation: 0,
                             ),
                             onPressed: () {
-                              QuickTradeModal.show(
-                                context,
-                                symbol: activeSymbol ?? 'BBRI',
-                                isBuy: true,
+                              context.read<NavigationCubit>().selectTab(
+                                AppNavTab.order,
                               );
                             },
                             child: const Text(

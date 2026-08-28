@@ -459,12 +459,46 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
   ) {
     if (!_isLoaded) return;
     final current = _loaded;
-    final updatedTabs = List<WorkspaceTabModel>.from(current.tabs);
-    updatedTabs[current.activeTabIndex] = _applyGridLayout(
-      current.activeTab.copyWith(isFreeFloating: false),
-      event.canvasSize,
+    final tab = current.activeTab;
+    if (tab.windows.isEmpty) return;
+
+    const spacing = 4.0;
+    const padding = 4.0;
+    final canvasWidth = event.canvasSize.width > 100
+        ? event.canvasSize.width
+        : 1920.0;
+
+    double currentX = padding;
+    double currentY = padding;
+    double rowMaxHeight = 0.0;
+
+    final arranged = <WorkspaceWindowModel>[];
+
+    for (int i = 0; i < tab.windows.length; i++) {
+      final win = tab.windows[i];
+      final winW = win.size.width;
+      final winH = win.size.height;
+
+      // Wrap to next line if placing this window overflows canvas width (and not first in row)
+      if (currentX + winW + padding > canvasWidth && currentX > padding) {
+        currentX = padding;
+        currentY += rowMaxHeight + spacing;
+        rowMaxHeight = 0.0;
+      }
+
+      arranged.add(
+        win.copyWith(position: Offset(currentX, currentY), zIndex: i),
+      );
+
+      currentX += winW + spacing;
+      rowMaxHeight = max(rowMaxHeight, winH);
+    }
+
+    _mutateActiveTab(
+      current,
+      emit,
+      (t) => t.copyWith(windows: arranged, isFreeFloating: true),
     );
-    emit(current.copyWith(tabs: updatedTabs));
   }
 
   void _onSetGridPreset(
@@ -733,13 +767,14 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
     const padding = 4.0;
 
     final isScrollable = tab.layoutMode == LayoutMode.scrollable;
-    final tileW = max(
-      280.0,
-      (canvasSize.width - padding * 2 - spacing * (c - 1)) / c,
-    );
-    final tileH = isScrollable
-        ? 340.0
-        : max(340.0, (canvasSize.height - padding * 2 - spacing * (r - 1)) / r);
+    final availableW = canvasSize.width > 200 ? canvasSize.width : 1280.0;
+    final availableH = canvasSize.height > 200 ? canvasSize.height : 720.0;
+
+    final computedW = (availableW - padding * 2 - spacing * (c - 1)) / c;
+    final computedH = (availableH - padding * 2 - spacing * (r - 1)) / r;
+
+    final tileW = max(180.0, computedW);
+    final tileH = isScrollable ? 340.0 : max(160.0, computedH);
 
     final arranged = <WorkspaceWindowModel>[];
     for (int i = 0; i < tab.windows.length; i++) {

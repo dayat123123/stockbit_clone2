@@ -2,11 +2,16 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stockbit_clone2/core/constants/app_colors.dart';
-import 'package:stockbit_clone2/core/workspace/models/workspace_widget_type.dart';
-import 'package:stockbit_clone2/core/workspace/models/workspace_window_model.dart';
 import 'package:stockbit_clone2/core/workspace/bloc/workspace_bloc.dart';
 import 'package:stockbit_clone2/core/workspace/bloc/workspace_event.dart';
+import 'package:stockbit_clone2/core/workspace/bloc/workspace_state.dart';
+import 'package:stockbit_clone2/core/workspace/models/layout_mode.dart';
+import 'package:stockbit_clone2/core/workspace/models/workspace_widget_type.dart';
+import 'package:stockbit_clone2/core/workspace/models/workspace_window_model.dart';
 import 'package:stockbit_clone2/core/workspace/factory/workspace_widget_factory.dart';
+import 'package:stockbit_clone2/core/workspace/utils/magnetic_snap_helper.dart';
+import 'package:stockbit_clone2/features/navigation/domain/entities/app_nav_tab.dart';
+import 'package:stockbit_clone2/features/navigation/presentation/cubit/navigation_cubit.dart';
 import 'package:stockbit_clone2/features/orderbook/presentation/widgets/stock_search_dialog.dart';
 import 'package:stockbit_clone2/features/trade/presentation/widgets/quick_trade_modal.dart';
 
@@ -132,17 +137,33 @@ class _WorkspaceWindowShellState extends State<WorkspaceWindowShell> {
                       },
                       onPanEnd: (_) {
                         _isInteracting = false;
-                        // Commit position and trigger magnetic snap in BLoC
+                        final state = context.read<WorkspaceBloc>().state;
+                        List<WorkspaceWindowModel> others = [];
+                        bool isScrollable = false;
+                        if (state is WorkspaceLoadedState) {
+                          others = state.activeTab.windows;
+                          isScrollable =
+                              state.activeTab.layoutMode ==
+                              LayoutMode.scrollable;
+                        }
+
+                        final snapped = MagneticSnapHelper.calculateSnap(
+                          activeWindowId: widget.window.id,
+                          targetPosition: _currentPosition,
+                          windowSize: _currentSize,
+                          otherWindows: others,
+                          canvasSize: widget.canvasSize,
+                          isScrollable: isScrollable,
+                        );
+
+                        setState(() {
+                          _currentPosition = snapped;
+                        });
+
                         context.read<WorkspaceBloc>().add(
                           MoveWindowEvent(
                             windowId: widget.window.id,
-                            delta: _currentPosition - widget.window.position,
-                            canvasSize: widget.canvasSize,
-                          ),
-                        );
-                        context.read<WorkspaceBloc>().add(
-                          SnapWindowOnReleaseEvent(
-                            windowId: widget.window.id,
+                            delta: snapped - widget.window.position,
                             canvasSize: widget.canvasSize,
                           ),
                         );
@@ -303,11 +324,17 @@ class _WorkspaceWindowShellState extends State<WorkspaceWindowShell> {
                                               .brokerSummary) ...[
                                     InkWell(
                                       onTap: () {
-                                        QuickTradeModal.show(
-                                          context,
-                                          symbol: widget.window.symbol,
-                                          isBuy: true,
-                                        );
+                                        try {
+                                          context
+                                              .read<NavigationCubit>()
+                                              .selectTab(AppNavTab.order);
+                                        } catch (_) {
+                                          QuickTradeModal.show(
+                                            context,
+                                            symbol: widget.window.symbol,
+                                            isBuy: true,
+                                          );
+                                        }
                                       },
                                       child: Container(
                                         padding: const EdgeInsets.symmetric(
@@ -577,18 +604,30 @@ class _WorkspaceWindowShellState extends State<WorkspaceWindowShell> {
 
   void _handleResizeEnd(BuildContext context) {
     _isInteracting = false;
-    // Commit final size and position to BLoC once on release with Magnetic Snap
+    final state = context.read<WorkspaceBloc>().state;
+    List<WorkspaceWindowModel> others = [];
+    if (state is WorkspaceLoadedState) {
+      others = state.activeTab.windows;
+    }
+
+    final snapResult = MagneticSnapHelper.calculateResizeSnap(
+      activeWindowId: widget.window.id,
+      position: _currentPosition,
+      targetSize: _currentSize,
+      otherWindows: others,
+      canvasSize: widget.canvasSize,
+    );
+
+    setState(() {
+      _currentSize = snapResult.size;
+      _currentPosition = snapResult.position;
+    });
+
     context.read<WorkspaceBloc>().add(
       ResizeWindowEvent(
         windowId: widget.window.id,
-        newSize: _currentSize,
-        newPosition: _currentPosition,
-      ),
-    );
-    context.read<WorkspaceBloc>().add(
-      SnapResizeOnReleaseEvent(
-        windowId: widget.window.id,
-        canvasSize: widget.canvasSize,
+        newSize: snapResult.size,
+        newPosition: snapResult.position,
       ),
     );
   }
