@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:stockbit_clone2/core/constants/app_colors.dart';
@@ -35,21 +37,23 @@ class DesktopAppTitleBar extends StatelessWidget {
           const SizedBox(width: 10),
           const Icon(Icons.trending_up, size: 13, color: AppColors.primaryDark),
           const SizedBox(width: 6),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary,
-              letterSpacing: 0.3,
+          if (Platform.isWindows)
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+                letterSpacing: 0.3,
+              ),
             ),
-          ),
 
           // ── Center: Full Drag Area to Move Window ─────────────────────────
           const Expanded(child: DragToMoveArea(child: SizedBox(height: 30))),
 
           // ── Right: Custom Window Control Buttons (Minimize, Maximize, Close)
-          CustomWindowCaptionButtons(showMaximize: showMaximize, height: 30),
+          if (Platform.isWindows)
+            CustomWindowCaptionButtons(showMaximize: showMaximize, height: 30),
         ],
       ),
     );
