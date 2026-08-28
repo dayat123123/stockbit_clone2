@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:stockbit_clone2/core/constants/app_colors.dart';
 
+/// Responsive Fixed Bottom Status Bar & Market Running Ticker
+/// styled precisely after the reference terminal layout.
 class DesktopBottomTicker extends StatefulWidget {
   const DesktopBottomTicker({super.key});
 
@@ -35,103 +37,121 @@ class _DesktopBottomTickerState extends State<DesktopBottomTicker> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 24,
-      decoration: const BoxDecoration(
-        color: AppColors.headerBg,
-        border: Border(top: BorderSide(color: AppColors.border, width: 1)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Row(
-        children: [
-          // Weather / IDX Status
-          const Icon(
-            Icons.wb_sunny_outlined,
-            size: 12,
-            color: AppColors.araYellow,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Container(
+          height: 24,
+          width: constraints.maxWidth,
+          decoration: const BoxDecoration(
+            color: AppColors.headerBg,
+            border: Border(top: BorderSide(color: AppColors.border, width: 0.8)),
           ),
-          const SizedBox(width: 4),
-          const Text(
-            '26°C Cerah',
-            style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: constraints.maxWidth - 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // ── Left: IHSG & Running Tickers ─────────────────────────
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // IHSG
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'IHSG ',
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const Text(
+                            '6,523.69 ',
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              color: AppColors.bidGreen,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const Text(
+                            '1.94(+0.03%)',
+                            style: TextStyle(
+                              fontSize: 8.5,
+                              color: AppColors.bidGreen,
+                            ),
+                          ),
+                        ],
+                      ),
 
-          const SizedBox(width: 16),
-          const VerticalDivider(
-            color: AppColors.border,
-            width: 1,
-            indent: 4,
-            endIndent: 4,
-          ),
-          const SizedBox(width: 16),
+                      const SizedBox(width: 14),
 
-          // Main Index: IHSG
-          const Text(
-            'IHSG',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+                      // Trending
+                      const Text(
+                        'Trending ',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                      const Text(
+                        '25(+1.28%)',
+                        style: TextStyle(
+                          fontSize: 8.5,
+                          color: AppColors.bidGreen,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+
+                      const SizedBox(width: 14),
+
+                      // Real-time Stock Tickers
+                      _buildTickerItem('INET', '338', '12(-3.43%)', AppColors.offerRed),
+                      const SizedBox(width: 12),
+                      _buildTickerItem('KIJA', '208', '10(-4.59%)', AppColors.offerRed),
+                      const SizedBox(width: 12),
+                      _buildTickerItem('CUAN', '810', '5(-0.61%)', AppColors.offerRed),
+                      const SizedBox(width: 12),
+                      _buildTickerItem('BUMI', '190', '4(-2.06%)', AppColors.offerRed),
+                      const SizedBox(width: 12),
+                      _buildTickerItem('RANS', '214', '6(-2.73%)', AppColors.offerRed),
+                      const SizedBox(width: 12),
+                      _buildTickerItem('PACK', '510', '44(+9.44%)', AppColors.bidGreen),
+                      const SizedBox(width: 12),
+                      _buildTickerItem('BBCA', '6,475', '75(+1.17%)', AppColors.bidGreen),
+                    ],
+                  ),
+
+                  const SizedBox(width: 20),
+
+                  // ── Right: Latency & Clock ───────────────────────────────
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.signal_cellular_alt, size: 11, color: AppColors.primaryDark),
+                      const SizedBox(width: 8),
+                      Text(
+                        _currentTime,
+                        style: const TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(width: 6),
-          const Text(
-            '6,521.75',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(width: 4),
-          const Text(
-            '+12.40 (+0.19%)',
-            style: TextStyle(fontSize: 10, color: AppColors.bidGreen),
-          ),
-
-          const SizedBox(width: 16),
-          const VerticalDivider(
-            color: AppColors.border,
-            width: 1,
-            indent: 4,
-            endIndent: 4,
-          ),
-          const SizedBox(width: 16),
-
-          // Trending Stocks Marquee / List
-          const Text(
-            'Trending:',
-            style: TextStyle(fontSize: 10, color: AppColors.textMuted),
-          ),
-          const SizedBox(width: 8),
-          _buildTickerItem('INET', '350', '+2.45%', AppColors.bidGreen),
-          const SizedBox(width: 12),
-          _buildTickerItem('KIJA', '218', '-0.91%', AppColors.offerRed),
-          const SizedBox(width: 12),
-          _buildTickerItem('DSSA', '1,140', '+0.00%', AppColors.neutral),
-          const SizedBox(width: 12),
-          _buildTickerItem('TPIA', '7,200', '+1.12%', AppColors.bidGreen),
-
-          const Spacer(),
-
-          // Connection status & Clock
-          const Icon(Icons.wifi, size: 11, color: AppColors.primaryGreen),
-          const SizedBox(width: 4),
-          const Text(
-            'Connected',
-            style: TextStyle(fontSize: 10, color: AppColors.primaryGreen),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            _currentTime,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -147,7 +167,7 @@ class _DesktopBottomTickerState extends State<DesktopBottomTicker> {
         Text(
           symbol,
           style: const TextStyle(
-            fontSize: 10,
+            fontSize: 9.5,
             fontWeight: FontWeight.bold,
             color: AppColors.textSecondary,
           ),
@@ -156,13 +176,21 @@ class _DesktopBottomTickerState extends State<DesktopBottomTicker> {
         Text(
           price,
           style: TextStyle(
-            fontSize: 10,
+            fontSize: 9.5,
             fontWeight: FontWeight.w600,
             color: color,
+            fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),
-        const SizedBox(width: 2),
-        Text(change, style: TextStyle(fontSize: 9, color: color)),
+        const SizedBox(width: 3),
+        Text(
+          change,
+          style: TextStyle(
+            fontSize: 8.5,
+            color: color,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
       ],
     );
   }

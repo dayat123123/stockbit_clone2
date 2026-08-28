@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
-import 'package:stockbit_clone2/core/workspace/models/window_widget_type.dart';
+import 'package:stockbit_clone2/core/workspace/models/layout_mode.dart';
+import 'package:stockbit_clone2/core/workspace/models/workspace_widget_type.dart';
 
 abstract class WorkspaceEvent extends Equatable {
   const WorkspaceEvent();
@@ -9,49 +10,48 @@ abstract class WorkspaceEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-// ─── Initialization ───────────────────────────────────────────────────────────
+// ─── Initialization ──────────────────────────────────────────────────────────
 
-/// Populate the workspace with a default set of windows.
-class InitWorkspaceEvent extends WorkspaceEvent {
-  /// List of (type, metadata) for each initial window to create.
-  final List<(WindowWidgetType, Map<String, dynamic>)> initialWindows;
-  const InitWorkspaceEvent({required this.initialWindows});
-
-  @override
-  List<Object?> get props => [initialWindows];
+class InitializeWorkspaceEvent extends WorkspaceEvent {
+  const InitializeWorkspaceEvent();
 }
 
-// ─── Tab Management ───────────────────────────────────────────────────────────
+// ─── Tabs ────────────────────────────────────────────────────────────────────
 
-class SelectTabEvent extends WorkspaceEvent {
+class SelectWorkspaceTabEvent extends WorkspaceEvent {
   final int tabIndex;
-  const SelectTabEvent(this.tabIndex);
+  const SelectWorkspaceTabEvent(this.tabIndex);
 
   @override
   List<Object?> get props => [tabIndex];
 }
 
-class AddTabEvent extends WorkspaceEvent {
+class AddWorkspaceTabEvent extends WorkspaceEvent {
   final String title;
-  final List<(WindowWidgetType, Map<String, dynamic>)> initialWindows;
-  const AddTabEvent({
-    this.title = 'Workspace',
-    this.initialWindows = const [],
+  final LayoutMode layoutMode;
+
+  const AddWorkspaceTabEvent({
+    this.title = 'Terminal Tab',
+    this.layoutMode = LayoutMode.fixed,
   });
 
   @override
-  List<Object?> get props => [title, initialWindows];
+  List<Object?> get props => [title, layoutMode];
 }
 
-class CloseTabEvent extends WorkspaceEvent {
+class CloseWorkspaceTabEvent extends WorkspaceEvent {
   final int tabIndex;
-  const CloseTabEvent(this.tabIndex);
+  const CloseWorkspaceTabEvent(this.tabIndex);
 
   @override
   List<Object?> get props => [tabIndex];
 }
 
-// ─── Window Focus ─────────────────────────────────────────────────────────────
+class ToggleTabModeEvent extends WorkspaceEvent {
+  const ToggleTabModeEvent();
+}
+
+// ─── Window Selection & Manipulation ─────────────────────────────────────────
 
 class SetActiveWindowEvent extends WorkspaceEvent {
   final String windowId;
@@ -61,7 +61,26 @@ class SetActiveWindowEvent extends WorkspaceEvent {
   List<Object?> get props => [windowId];
 }
 
-// ─── Window Move ──────────────────────────────────────────────────────────────
+class ChangeWindowSymbolEvent extends WorkspaceEvent {
+  final String windowId;
+  final String newSymbol;
+
+  const ChangeWindowSymbolEvent({
+    required this.windowId,
+    required this.newSymbol,
+  });
+
+  @override
+  List<Object?> get props => [windowId, newSymbol];
+}
+
+class ResetWindowSlotEvent extends WorkspaceEvent {
+  final String windowId;
+  const ResetWindowSlotEvent(this.windowId);
+
+  @override
+  List<Object?> get props => [windowId];
+}
 
 class MoveWindowEvent extends WorkspaceEvent {
   final String windowId;
@@ -71,39 +90,68 @@ class MoveWindowEvent extends WorkspaceEvent {
   const MoveWindowEvent({
     required this.windowId,
     required this.delta,
-    this.canvasSize = const Size(1400, 800),
+    required this.canvasSize,
   });
 
   @override
   List<Object?> get props => [windowId, delta, canvasSize];
 }
 
-// ─── Window Resize ────────────────────────────────────────────────────────────
+class SnapWindowOnReleaseEvent extends WorkspaceEvent {
+  final String windowId;
+  final Size canvasSize;
+
+  const SnapWindowOnReleaseEvent({
+    required this.windowId,
+    required this.canvasSize,
+  });
+
+  @override
+  List<Object?> get props => [windowId, canvasSize];
+}
 
 class ResizeWindowEvent extends WorkspaceEvent {
   final String windowId;
   final Size newSize;
-  const ResizeWindowEvent({required this.windowId, required this.newSize});
+  final Offset? newPosition;
 
-  @override
-  List<Object?> get props => [windowId, newSize];
-}
-
-// ─── Window CRUD ──────────────────────────────────────────────────────────────
-
-class AddWindowEvent extends WorkspaceEvent {
-  final WindowWidgetType widgetType;
-  final Map<String, dynamic> metadata;
-  final Size canvasSize;
-
-  const AddWindowEvent({
-    required this.widgetType,
-    this.metadata = const {},
-    this.canvasSize = const Size(1400, 800),
+  const ResizeWindowEvent({
+    required this.windowId,
+    required this.newSize,
+    this.newPosition,
   });
 
   @override
-  List<Object?> get props => [widgetType, metadata, canvasSize];
+  List<Object?> get props => [windowId, newSize, newPosition];
+}
+
+class SnapResizeOnReleaseEvent extends WorkspaceEvent {
+  final String windowId;
+  final Size canvasSize;
+
+  const SnapResizeOnReleaseEvent({
+    required this.windowId,
+    required this.canvasSize,
+  });
+
+  @override
+  List<Object?> get props => [windowId, canvasSize];
+}
+
+/// Added exclusively via Toolbar / Header Add Window button.
+class AddNewWindowToWorkspaceEvent extends WorkspaceEvent {
+  final WorkspaceWidgetType type;
+  final String symbol;
+  final Size canvasSize;
+
+  const AddNewWindowToWorkspaceEvent({
+    required this.type,
+    this.symbol = 'BBCA',
+    required this.canvasSize,
+  });
+
+  @override
+  List<Object?> get props => [type, symbol, canvasSize];
 }
 
 class RemoveWindowEvent extends WorkspaceEvent {
@@ -114,23 +162,7 @@ class RemoveWindowEvent extends WorkspaceEvent {
   List<Object?> get props => [windowId];
 }
 
-class UpdateWindowMetadataEvent extends WorkspaceEvent {
-  final String windowId;
-  final Map<String, dynamic> metadata;
-  const UpdateWindowMetadataEvent({
-    required this.windowId,
-    required this.metadata,
-  });
-
-  @override
-  List<Object?> get props => [windowId, metadata];
-}
-
-// ─── Layout ───────────────────────────────────────────────────────────────────
-
-class ToggleLayoutModeEvent extends WorkspaceEvent {
-  const ToggleLayoutModeEvent();
-}
+// ─── Layout & Arrangement ─────────────────────────────────────────────────────
 
 class AutoArrangeWindowsEvent extends WorkspaceEvent {
   final Size canvasSize;
@@ -148,19 +180,78 @@ class SetGridPresetEvent extends WorkspaceEvent {
   const SetGridPresetEvent({
     required this.rows,
     required this.columns,
-    this.canvasSize = const Size(1400, 800),
+    required this.canvasSize,
   });
 
   @override
   List<Object?> get props => [rows, columns, canvasSize];
 }
 
-// ─── Search ───────────────────────────────────────────────────────────────────
-
-class FilterGlobalSearchEvent extends WorkspaceEvent {
+class GlobalSearchSymbolEvent extends WorkspaceEvent {
   final String query;
-  const FilterGlobalSearchEvent(this.query);
+  const GlobalSearchSymbolEvent(this.query);
 
   @override
   List<Object?> get props => [query];
+}
+
+enum WorkspaceLayoutTemplate {
+  newLayout(
+    title: 'New Layout',
+    subtitle: 'Add widgets and customize your way.',
+    tag: 'Custom',
+  ),
+  multiOrderbook(
+    title: 'Multi-orderbook',
+    subtitle: 'Display 10 different stock orderbook.',
+    tag: 'Template',
+  ),
+  multiChart(
+    title: 'Multi-chart',
+    subtitle: 'Observe multiple stocks charts.',
+    tag: 'Template',
+  ),
+  classic(
+    title: 'Classic',
+    subtitle: 'Basic stock trading layout.',
+    tag: 'Template',
+  ),
+  multiStock(
+    title: 'Multi-stock',
+    subtitle: 'Monitor multiple stocks at the same time.',
+    tag: 'Template',
+  ),
+  singleStock(
+    title: 'Single-stock',
+    subtitle: 'Focused stock trading dashboard.',
+    tag: 'Template',
+  ),
+  fastOrder(
+    title: 'Fast Order',
+    subtitle: 'Experience quick trades execution.',
+    tag: 'Template',
+  );
+
+  final String title;
+  final String subtitle;
+  final String tag;
+
+  const WorkspaceLayoutTemplate({
+    required this.title,
+    required this.subtitle,
+    required this.tag,
+  });
+}
+
+class CreateTemplateLayoutEvent extends WorkspaceEvent {
+  final WorkspaceLayoutTemplate template;
+  final Size canvasSize;
+
+  const CreateTemplateLayoutEvent({
+    required this.template,
+    required this.canvasSize,
+  });
+
+  @override
+  List<Object?> get props => [template, canvasSize];
 }

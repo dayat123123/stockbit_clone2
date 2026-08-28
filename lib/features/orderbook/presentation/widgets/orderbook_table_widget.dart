@@ -47,51 +47,69 @@ class OrderbookTableWidget extends StatelessWidget {
             children: [
               Expanded(
                 flex: 2,
-                child: Text(
-                  'Freq',
-                  textAlign: TextAlign.left,
-                  style: TextStyle(fontSize: 9, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Freq',
+                    style: TextStyle(fontSize: 8.5, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
               Expanded(
                 flex: 3,
-                child: Text(
-                  'Lot',
-                  textAlign: TextAlign.right,
-                  style: TextStyle(fontSize: 9, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'Lot',
+                    style: TextStyle(fontSize: 8.5, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
               Expanded(
                 flex: 3,
-                child: Text(
-                  'Bid',
-                  textAlign: TextAlign.right,
-                  style: TextStyle(fontSize: 9, color: AppColors.bidGreen, fontWeight: FontWeight.bold),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'Bid',
+                    style: TextStyle(fontSize: 8.5, color: AppColors.bidGreen, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
               VerticalDivider(width: 8, color: AppColors.border, thickness: 1),
               Expanded(
                 flex: 3,
-                child: Text(
-                  'Offer',
-                  textAlign: TextAlign.left,
-                  style: TextStyle(fontSize: 9, color: AppColors.offerRed, fontWeight: FontWeight.bold),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Offer',
+                    style: TextStyle(fontSize: 8.5, color: AppColors.offerRed, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
               Expanded(
                 flex: 3,
-                child: Text(
-                  'Lot',
-                  textAlign: TextAlign.left,
-                  style: TextStyle(fontSize: 9, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Lot',
+                    style: TextStyle(fontSize: 8.5, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
               Expanded(
                 flex: 2,
-                child: Text(
-                  'Freq',
-                  textAlign: TextAlign.right,
-                  style: TextStyle(fontSize: 9, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'Freq',
+                    style: TextStyle(fontSize: 8.5, color: AppColors.textMuted, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
             ],
@@ -149,33 +167,43 @@ class OrderbookTableWidget extends StatelessWidget {
                                 children: [
                                   Expanded(
                                     flex: 2,
-                                    child: Text(
-                                      row.bidFreq > 0 ? '${row.bidFreq}' : '-',
-                                      style: const TextStyle(fontSize: 9, color: AppColors.textSecondary),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 3,
-                                    child: Text(
-                                      row.bidLot > 0 ? numberFormat.format(row.bidLot) : '-',
-                                      textAlign: TextAlign.right,
-                                      style: const TextStyle(
-                                        fontSize: 9,
-                                        color: AppColors.textPrimary,
-                                        fontFeatures: [FontFeature.tabularFigures()],
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        row.bidFreq > 0 ? '${row.bidFreq}' : '-',
+                                        style: const TextStyle(fontSize: 8.5, color: AppColors.textSecondary),
                                       ),
                                     ),
                                   ),
                                   Expanded(
                                     flex: 3,
-                                    child: Text(
-                                      row.bidPrice > 0 ? numberFormat.format(row.bidPrice.toInt()) : '-',
-                                      textAlign: TextAlign.right,
-                                      style: const TextStyle(
-                                        fontSize: 9,
-                                        color: AppColors.bidGreen,
-                                        fontWeight: FontWeight.w600,
-                                        fontFeatures: [FontFeature.tabularFigures()],
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerRight,
+                                      child: Text(
+                                        row.bidLot > 0 ? numberFormat.format(row.bidLot) : '-',
+                                        style: const TextStyle(
+                                          fontSize: 8.5,
+                                          color: AppColors.textPrimary,
+                                          fontFeatures: [FontFeature.tabularFigures()],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 3,
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerRight,
+                                      child: Text(
+                                        row.bidPrice > 0 ? numberFormat.format(row.bidPrice.toInt()) : '-',
+                                        style: const TextStyle(
+                                          fontSize: 8.5,
+                                          color: AppColors.bidGreen,
+                                          fontWeight: FontWeight.w600,
+                                          fontFeatures: [FontFeature.tabularFigures()],
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -187,7 +215,7 @@ class OrderbookTableWidget extends StatelessWidget {
                       ),
                     ),
 
-                    const VerticalDivider(width: 8, color: AppColors.border, thickness: 0.5),
+                    const VerticalDivider(width: 8, color: AppColors.border, thickness: 0.8),
 
                     // Offer Side (Click to Quick Sell)
                     Expanded(
@@ -221,35 +249,44 @@ class OrderbookTableWidget extends StatelessWidget {
                                 children: [
                                   Expanded(
                                     flex: 3,
-                                    child: Text(
-                                      row.offerPrice > 0 ? numberFormat.format(row.offerPrice.toInt()) : '-',
-                                      textAlign: TextAlign.left,
-                                      style: const TextStyle(
-                                        fontSize: 9,
-                                        color: AppColors.offerRed,
-                                        fontWeight: FontWeight.w600,
-                                        fontFeatures: [FontFeature.tabularFigures()],
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        row.offerPrice > 0 ? numberFormat.format(row.offerPrice.toInt()) : '-',
+                                        style: const TextStyle(
+                                          fontSize: 8.5,
+                                          color: AppColors.offerRed,
+                                          fontWeight: FontWeight.w600,
+                                          fontFeatures: [FontFeature.tabularFigures()],
+                                        ),
                                       ),
                                     ),
                                   ),
                                   Expanded(
                                     flex: 3,
-                                    child: Text(
-                                      row.offerLot > 0 ? numberFormat.format(row.offerLot) : '-',
-                                      textAlign: TextAlign.left,
-                                      style: const TextStyle(
-                                        fontSize: 9,
-                                        color: AppColors.textPrimary,
-                                        fontFeatures: [FontFeature.tabularFigures()],
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        row.offerLot > 0 ? numberFormat.format(row.offerLot) : '-',
+                                        style: const TextStyle(
+                                          fontSize: 8.5,
+                                          color: AppColors.textPrimary,
+                                          fontFeatures: [FontFeature.tabularFigures()],
+                                        ),
                                       ),
                                     ),
                                   ),
                                   Expanded(
                                     flex: 2,
-                                    child: Text(
-                                      row.offerFreq > 0 ? '${row.offerFreq}' : '-',
-                                      textAlign: TextAlign.right,
-                                      style: const TextStyle(fontSize: 9, color: AppColors.textSecondary),
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerRight,
+                                      child: Text(
+                                        row.offerFreq > 0 ? '${row.offerFreq}' : '-',
+                                        style: const TextStyle(fontSize: 8.5, color: AppColors.textSecondary),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -266,30 +303,48 @@ class OrderbookTableWidget extends StatelessWidget {
           ),
         ),
 
-        // Total Lots Footer
+        // Total Bid vs Total Offer Footer Summary
         Container(
-          height: 20,
+          height: 22,
           padding: const EdgeInsets.symmetric(horizontal: 6),
           decoration: const BoxDecoration(
             color: AppColors.cardSurface,
-            border: Border(
-              top: BorderSide(color: AppColors.border, width: 0.5),
-            ),
+            border: Border(top: BorderSide(color: AppColors.border, width: 0.8)),
           ),
           child: Row(
             children: [
-              const Text('Total Bid:', style: TextStyle(fontSize: 9, color: AppColors.textMuted)),
-              const SizedBox(width: 4),
-              Text(
-                numberFormat.format(totalBidLot),
-                style: const TextStyle(fontSize: 9, color: AppColors.bidGreen, fontWeight: FontWeight.bold),
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Total Bid: ', style: TextStyle(fontSize: 8.5, color: AppColors.textMuted)),
+                      Text(
+                        numberFormat.format(totalBidLot),
+                        style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: AppColors.bidGreen),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              const Spacer(),
-              const Text('Total Offer:', style: TextStyle(fontSize: 9, color: AppColors.textMuted)),
-              const SizedBox(width: 4),
-              Text(
-                numberFormat.format(totalOfferLot),
-                style: const TextStyle(fontSize: 9, color: AppColors.offerRed, fontWeight: FontWeight.bold),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Total Offer: ', style: TextStyle(fontSize: 8.5, color: AppColors.textMuted)),
+                      Text(
+                        numberFormat.format(totalOfferLot),
+                        style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: AppColors.offerRed),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),

@@ -1,147 +1,251 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:stockbit_clone2/core/workspace/models/layout_mode.dart';
+import 'package:stockbit_clone2/core/workspace/models/workspace_tab_model.dart';
+import 'package:stockbit_clone2/core/workspace/models/workspace_widget_type.dart';
+import 'package:stockbit_clone2/core/workspace/models/workspace_window_model.dart';
 import 'package:stockbit_clone2/core/workspace/bloc/workspace_event.dart';
 import 'package:stockbit_clone2/core/workspace/bloc/workspace_state.dart';
-import 'package:stockbit_clone2/core/workspace/models/window_widget_type.dart';
-import 'package:stockbit_clone2/core/workspace/models/workspace_tab.dart';
-import 'package:stockbit_clone2/core/workspace/models/workspace_window.dart';
+import 'package:stockbit_clone2/core/workspace/utils/magnetic_snap_helper.dart';
 
-/// Manages all workspace window operations: move, resize, add, remove,
-/// tabs, layout modes, and grid arrangement.
-///
-/// This bloc is **feature-agnostic** — it doesn't know about orderbook data
-/// or any specific widget content. It only manages window geometry and metadata.
+/// Central BLoC in core managing all workspace tabs, modular window instances,
+/// layout modes (Fixed vs Scrollable), drag/drop, and grid calculations.
 class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
   int _tabCounter = 1;
-  int _windowCounter = 0;
+  int _windowCounter = 1;
 
   WorkspaceBloc() : super(const WorkspaceInitialState()) {
-    on<InitWorkspaceEvent>(_onInit);
-    // Tabs
-    on<SelectTabEvent>(_onSelectTab);
-    on<AddTabEvent>(_onAddTab);
-    on<CloseTabEvent>(_onCloseTab);
-    // Windows
+    on<InitializeWorkspaceEvent>(_onInitializeWorkspace);
+    on<SelectWorkspaceTabEvent>(_onSelectWorkspaceTab);
+    on<AddWorkspaceTabEvent>(_onAddWorkspaceTab);
+    on<CloseWorkspaceTabEvent>(_onCloseWorkspaceTab);
+    on<ToggleTabModeEvent>(_onToggleTabMode);
     on<SetActiveWindowEvent>(_onSetActiveWindow);
+    on<ChangeWindowSymbolEvent>(_onChangeWindowSymbol);
+    on<ResetWindowSlotEvent>(_onResetWindowSlot);
     on<MoveWindowEvent>(_onMoveWindow);
+    on<SnapWindowOnReleaseEvent>(_onSnapWindowOnRelease);
     on<ResizeWindowEvent>(_onResizeWindow);
-    on<AddWindowEvent>(_onAddWindow);
+    on<SnapResizeOnReleaseEvent>(_onSnapResizeOnRelease);
+    on<AddNewWindowToWorkspaceEvent>(_onAddNewWindowToWorkspace);
     on<RemoveWindowEvent>(_onRemoveWindow);
-    on<UpdateWindowMetadataEvent>(_onUpdateWindowMetadata);
-    // Layout
-    on<ToggleLayoutModeEvent>(_onToggleLayoutMode);
     on<AutoArrangeWindowsEvent>(_onAutoArrangeWindows);
     on<SetGridPresetEvent>(_onSetGridPreset);
-    // Search
-    on<FilterGlobalSearchEvent>(_onFilterGlobalSearch);
+    on<GlobalSearchSymbolEvent>(_onGlobalSearchSymbol);
+    on<CreateTemplateLayoutEvent>(_onCreateTemplateLayout);
   }
 
-  // ─── Helpers ──────────────────────────────────────────────────────────────
+  // ─── Helpers ────────────────────────────────────────────────────────────────
 
   WorkspaceLoadedState get _loaded => state as WorkspaceLoadedState;
   bool get _isLoaded => state is WorkspaceLoadedState;
 
-  String _nextWindowId() => 'win_${++_windowCounter}';
-
   void _mutateActiveTab(
     WorkspaceLoadedState current,
     Emitter<WorkspaceState> emit,
-    WorkspaceTab Function(WorkspaceTab tab) mutate,
+    WorkspaceTabModel Function(WorkspaceTabModel tab) mutate,
   ) {
-    final updatedTabs = List<WorkspaceTab>.from(current.tabs);
+    final updatedTabs = List<WorkspaceTabModel>.from(current.tabs);
     updatedTabs[current.activeTabIndex] = mutate(current.activeTab);
-    emit(current.copyWith(tabs: updatedTabs));
+    emit(current.copyWith(tabs: updatedTabs, lastUpdated: DateTime.now()));
   }
 
-  // ─── Init ─────────────────────────────────────────────────────────────────
+  // ─── Handlers ───────────────────────────────────────────────────────────────
 
-  void _onInit(InitWorkspaceEvent event, Emitter<WorkspaceState> emit) {
-    final windows = <WorkspaceWindow>[
-      for (int i = 0; i < event.initialWindows.length; i++)
-        WorkspaceWindow(
-          id: _nextWindowId(),
-          widgetType: event.initialWindows[i].$1,
-          metadata: event.initialWindows[i].$2,
-          position: Offset((i % 4) * 354.0 + 4, (i ~/ 4) * 394.0 + 4),
-          size: event.initialWindows[i].$1.defaultSize,
-          zIndex: i,
-        ),
+  void _onInitializeWorkspace(
+    InitializeWorkspaceEvent event,
+    Emitter<WorkspaceState> emit,
+  ) {
+    final tab1Windows = <WorkspaceWindowModel>[
+      WorkspaceWindowModel(
+        id: 'win_${_windowCounter++}',
+        type: WorkspaceWidgetType.orderbook,
+        symbol: 'BBCA',
+        position: const Offset(4, 4),
+        size: const Size(350, 390),
+        zIndex: 0,
+      ),
+      WorkspaceWindowModel(
+        id: 'win_${_windowCounter++}',
+        type: WorkspaceWidgetType.orderbook,
+        symbol: 'BBRI',
+        position: const Offset(358, 4),
+        size: const Size(350, 390),
+        zIndex: 1,
+      ),
+      WorkspaceWindowModel(
+        id: 'win_${_windowCounter++}',
+        type: WorkspaceWidgetType.chart,
+        symbol: 'BBCA',
+        position: const Offset(712, 4),
+        size: const Size(350, 390),
+        zIndex: 2,
+      ),
+      WorkspaceWindowModel(
+        id: 'win_${_windowCounter++}',
+        type: WorkspaceWidgetType.watchlist,
+        symbol: 'BMRI',
+        position: const Offset(1066, 4),
+        size: const Size(350, 390),
+        zIndex: 3,
+      ),
+      WorkspaceWindowModel(
+        id: 'win_${_windowCounter++}',
+        type: WorkspaceWidgetType.orderbook,
+        symbol: 'BMRI',
+        position: const Offset(4, 398),
+        size: const Size(350, 390),
+        zIndex: 4,
+      ),
+      WorkspaceWindowModel(
+        id: 'win_${_windowCounter++}',
+        type: WorkspaceWidgetType.orderbook,
+        symbol: 'TLKM',
+        position: const Offset(358, 398),
+        size: const Size(350, 390),
+        zIndex: 5,
+      ),
+      WorkspaceWindowModel(
+        id: 'win_${_windowCounter++}',
+        type: WorkspaceWidgetType.brokerSummary,
+        symbol: 'BBRI',
+        position: const Offset(712, 398),
+        size: const Size(350, 390),
+        zIndex: 6,
+      ),
+      WorkspaceWindowModel(
+        id: 'win_${_windowCounter++}',
+        type: WorkspaceWidgetType.market,
+        symbol: 'IHSG',
+        position: const Offset(1066, 398),
+        size: const Size(350, 390),
+        zIndex: 7,
+      ),
     ];
 
-    emit(WorkspaceLoadedState(
-      tabs: [
-        WorkspaceTab(
-          id: 'tab_1',
-          title: 'Multi-orderbook',
-          windows: windows,
-          activeWindowId: windows.isNotEmpty ? windows.first.id : null,
-          isFreeFloating: false,
-          gridRows: 2,
-          gridColumns: 4,
-        ),
-      ],
-      activeTabIndex: 0,
-    ));
+    emit(
+      WorkspaceLoadedState(
+        tabs: [
+          WorkspaceTabModel(
+            id: 'tab_1',
+            title: 'Fixed Terminal #1',
+            layoutMode: LayoutMode.fixed,
+            windows: tab1Windows,
+            activeWindowId: tab1Windows.first.id,
+            isFreeFloating: false,
+            gridRows: 2,
+            gridColumns: 4,
+          ),
+        ],
+        activeTabIndex: 0,
+        lastUpdated: DateTime.now(),
+      ),
+    );
   }
 
-  // ─── Tab Management ───────────────────────────────────────────────────────
-
-  void _onSelectTab(SelectTabEvent event, Emitter<WorkspaceState> emit) {
+  void _onSelectWorkspaceTab(
+    SelectWorkspaceTabEvent event,
+    Emitter<WorkspaceState> emit,
+  ) {
     if (!_isLoaded) return;
-    final current = _loaded;
-    if (event.tabIndex >= 0 && event.tabIndex < current.tabs.length) {
-      emit(current.copyWith(activeTabIndex: event.tabIndex));
+    if (event.tabIndex >= 0 && event.tabIndex < _loaded.tabs.length) {
+      emit(_loaded.copyWith(activeTabIndex: event.tabIndex));
     }
   }
 
-  void _onAddTab(AddTabEvent event, Emitter<WorkspaceState> emit) {
+  void _onAddWorkspaceTab(
+    AddWorkspaceTabEvent event,
+    Emitter<WorkspaceState> emit,
+  ) {
     if (!_isLoaded) return;
     final current = _loaded;
     _tabCounter++;
 
-    final newWindows = <WorkspaceWindow>[
-      for (int i = 0; i < event.initialWindows.length; i++)
-        WorkspaceWindow(
-          id: _nextWindowId(),
-          widgetType: event.initialWindows[i].$1,
-          metadata: event.initialWindows[i].$2,
-          position: Offset((i % 2) * 354.0 + 4, (i ~/ 2) * 394.0 + 4),
-          size: event.initialWindows[i].$1.defaultSize,
-          zIndex: i,
-        ),
+    final newWindows = <WorkspaceWindowModel>[
+      WorkspaceWindowModel(
+        id: 'win_${_windowCounter++}',
+        type: WorkspaceWidgetType.orderbook,
+        symbol: 'ASII',
+        position: const Offset(4, 4),
+        size: const Size(500, 390),
+        zIndex: 0,
+      ),
+      WorkspaceWindowModel(
+        id: 'win_${_windowCounter++}',
+        type: WorkspaceWidgetType.chart,
+        symbol: 'ASII',
+        position: const Offset(508, 4),
+        size: const Size(500, 390),
+        zIndex: 1,
+      ),
+      WorkspaceWindowModel(
+        id: 'win_${_windowCounter++}',
+        type: WorkspaceWidgetType.screener,
+        symbol: 'BBNI',
+        position: const Offset(4, 398),
+        size: const Size(500, 390),
+        zIndex: 2,
+      ),
+      WorkspaceWindowModel(
+        id: 'win_${_windowCounter++}',
+        type: WorkspaceWidgetType.portfolio,
+        symbol: 'PORTFOLIO',
+        position: const Offset(508, 398),
+        size: const Size(500, 390),
+        zIndex: 3,
+      ),
     ];
 
-    final newTab = WorkspaceTab(
+    final newTab = WorkspaceTabModel(
       id: 'tab_$_tabCounter',
       title: '${event.title} #$_tabCounter',
+      layoutMode: event.layoutMode,
       windows: newWindows,
-      activeWindowId: newWindows.isNotEmpty ? newWindows.first.id : null,
+      activeWindowId: newWindows.first.id,
       isFreeFloating: false,
       gridRows: 2,
       gridColumns: 2,
     );
 
-    final updatedTabs = List<WorkspaceTab>.from(current.tabs)..add(newTab);
-    emit(current.copyWith(
-      tabs: updatedTabs,
-      activeTabIndex: updatedTabs.length - 1,
-    ));
+    final updatedTabs = List<WorkspaceTabModel>.from(current.tabs)..add(newTab);
+    emit(
+      current.copyWith(
+        tabs: updatedTabs,
+        activeTabIndex: updatedTabs.length - 1,
+      ),
+    );
   }
 
-  void _onCloseTab(CloseTabEvent event, Emitter<WorkspaceState> emit) {
+  void _onCloseWorkspaceTab(
+    CloseWorkspaceTabEvent event,
+    Emitter<WorkspaceState> emit,
+  ) {
     if (!_isLoaded) return;
     final current = _loaded;
     if (current.tabs.length <= 1) return;
 
-    final updatedTabs = List<WorkspaceTab>.from(current.tabs)
+    final updatedTabs = List<WorkspaceTabModel>.from(current.tabs)
       ..removeAt(event.tabIndex);
-    final newIndex =
-        current.activeTabIndex.clamp(0, updatedTabs.length - 1);
+    final newIndex = current.activeTabIndex.clamp(0, updatedTabs.length - 1);
     emit(current.copyWith(tabs: updatedTabs, activeTabIndex: newIndex));
   }
 
-  // ─── Window Focus ─────────────────────────────────────────────────────────
+  void _onToggleTabMode(
+    ToggleTabModeEvent event,
+    Emitter<WorkspaceState> emit,
+  ) {
+    if (!_isLoaded) return;
+    final current = _loaded;
+    final currentMode = current.activeTab.layoutMode;
+    final nextMode = currentMode == LayoutMode.fixed
+        ? LayoutMode.scrollable
+        : LayoutMode.fixed;
+
+    _mutateActiveTab(current, emit, (tab) {
+      return tab.copyWith(layoutMode: nextMode);
+    });
+  }
 
   void _onSetActiveWindow(
     SetActiveWindowEvent event,
@@ -149,8 +253,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
   ) {
     if (!_isLoaded) return;
     final current = _loaded;
-    final maxZ =
-        current.activeTab.windows.fold(0, (m, w) => max(m, w.zIndex));
+    final maxZ = current.activeTab.windows.fold(0, (m, w) => max(m, w.zIndex));
 
     _mutateActiveTab(
       current,
@@ -158,21 +261,52 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
       (tab) => tab.copyWith(
         activeWindowId: event.windowId,
         windows: tab.windows.map((w) {
-          return w.id == event.windowId
-              ? w.copyWith(zIndex: maxZ + 1)
-              : w;
+          return w.id == event.windowId ? w.copyWith(zIndex: maxZ + 1) : w;
         }).toList(),
       ),
     );
   }
 
-  // ─── Window Move ──────────────────────────────────────────────────────────
+  void _onChangeWindowSymbol(
+    ChangeWindowSymbolEvent event,
+    Emitter<WorkspaceState> emit,
+  ) {
+    if (!_isLoaded) return;
+    final sym = event.newSymbol.trim().toUpperCase();
+    if (sym.isEmpty) return;
+
+    _mutateActiveTab(
+      _loaded,
+      emit,
+      (tab) => tab.copyWith(
+        activeWindowId: event.windowId,
+        windows: tab.windows.map((w) {
+          return w.id == event.windowId ? w.copyWith(symbol: sym) : w;
+        }).toList(),
+      ),
+    );
+  }
+
+  void _onResetWindowSlot(
+    ResetWindowSlotEvent event,
+    Emitter<WorkspaceState> emit,
+  ) {
+    if (!_isLoaded) return;
+    _mutateActiveTab(
+      _loaded,
+      emit,
+      (tab) => tab.copyWith(
+        windows: tab.windows.map((w) {
+          return w.id == event.windowId ? w.copyWith(symbol: 'BBRI') : w;
+        }).toList(),
+      ),
+    );
+  }
 
   void _onMoveWindow(MoveWindowEvent event, Emitter<WorkspaceState> emit) {
     if (!_isLoaded) return;
     final current = _loaded;
-    final maxZ =
-        current.activeTab.windows.fold(0, (m, w) => max(m, w.zIndex));
+    final maxZ = current.activeTab.windows.fold(0, (m, w) => max(m, w.zIndex));
 
     _mutateActiveTab(current, emit, (tab) {
       return tab.copyWith(
@@ -180,115 +314,143 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
         isFreeFloating: true,
         windows: tab.windows.map((w) {
           if (w.id != event.windowId) return w;
-          return w.copyWith(
-            zIndex: maxZ + 1,
-            position: Offset(
-              (w.position.dx + event.delta.dx)
-                  .clamp(0.0, max(0.0, event.canvasSize.width - 60)),
-              (w.position.dy + event.delta.dy)
-                  .clamp(0.0, max(0.0, event.canvasSize.height - 40)),
-            ),
-          );
+          final newDx = (w.position.dx + event.delta.dx)
+              .clamp(0.0, max(0.0, event.canvasSize.width - 60))
+              .toDouble();
+          final maxY = max(0.0, event.canvasSize.height - 40);
+          final newDy = (w.position.dy + event.delta.dy)
+              .clamp(0.0, maxY)
+              .toDouble();
+
+          return w.copyWith(zIndex: maxZ + 1, position: Offset(newDx, newDy));
         }).toList(),
       );
     });
   }
 
-  // ─── Resize ───────────────────────────────────────────────────────────────
-
-  void _onResizeWindow(
-    ResizeWindowEvent event,
+  void _onSnapWindowOnRelease(
+    SnapWindowOnReleaseEvent event,
     Emitter<WorkspaceState> emit,
   ) {
     if (!_isLoaded) return;
-    _mutateActiveTab(_loaded, emit, (tab) {
+    final current = _loaded;
+    final activeTab = current.activeTab;
+    final targetWindow = activeTab.windows.firstWhere(
+      (w) => w.id == event.windowId,
+      orElse: () => activeTab.windows.first,
+    );
+    final isScrollable = activeTab.layoutMode == LayoutMode.scrollable;
+
+    final snappedOffset = MagneticSnapHelper.calculateSnap(
+      activeWindowId: event.windowId,
+      targetPosition: targetWindow.position,
+      windowSize: targetWindow.size,
+      otherWindows: activeTab.windows,
+      canvasSize: event.canvasSize,
+      isScrollable: isScrollable,
+    );
+
+    _mutateActiveTab(current, emit, (tab) {
       return tab.copyWith(
         windows: tab.windows.map((w) {
           return w.id == event.windowId
-              ? w.copyWith(size: event.newSize)
+              ? w.copyWith(position: snappedOffset)
               : w;
         }).toList(),
       );
     });
   }
 
-  // ─── Window CRUD ──────────────────────────────────────────────────────────
+  void _onResizeWindow(ResizeWindowEvent event, Emitter<WorkspaceState> emit) {
+    if (!_isLoaded) return;
+    _mutateActiveTab(
+      _loaded,
+      emit,
+      (tab) => tab.copyWith(
+        windows: tab.windows.map((w) {
+          if (w.id != event.windowId) return w;
+          return w.copyWith(
+            size: event.newSize,
+            position: event.newPosition ?? w.position,
+          );
+        }).toList(),
+      ),
+    );
+  }
 
-  void _onAddWindow(AddWindowEvent event, Emitter<WorkspaceState> emit) {
+  void _onSnapResizeOnRelease(
+    SnapResizeOnReleaseEvent event,
+    Emitter<WorkspaceState> emit,
+  ) {
     if (!_isLoaded) return;
     final current = _loaded;
-    final maxZ =
-        current.activeTab.windows.fold(0, (m, w) => max(m, w.zIndex));
+    final activeTab = current.activeTab;
+    final targetWindow = activeTab.windows.firstWhere(
+      (w) => w.id == event.windowId,
+      orElse: () => activeTab.windows.first,
+    );
 
-    final offset = (current.activeTab.windows.length * 30.0) % 200;
-    final newWindow = WorkspaceWindow(
-      id: _nextWindowId(),
-      widgetType: event.widgetType,
-      metadata: event.metadata,
-      position: Offset(40 + offset, 40 + offset),
-      size: event.widgetType.defaultSize,
-      zIndex: maxZ + 1,
+    final snapResult = MagneticSnapHelper.calculateResizeSnap(
+      activeWindowId: event.windowId,
+      position: targetWindow.position,
+      targetSize: targetWindow.size,
+      otherWindows: activeTab.windows,
+      canvasSize: event.canvasSize,
     );
 
     _mutateActiveTab(current, emit, (tab) {
       return tab.copyWith(
-        activeWindowId: newWindow.id,
-        windows: [...tab.windows, newWindow],
-      );
-    });
-  }
-
-  void _onRemoveWindow(
-    RemoveWindowEvent event,
-    Emitter<WorkspaceState> emit,
-  ) {
-    if (!_isLoaded) return;
-    _mutateActiveTab(_loaded, emit, (tab) {
-      final remaining =
-          tab.windows.where((w) => w.id != event.windowId).toList();
-      return tab.copyWith(
-        windows: remaining,
-        activeWindowId: remaining.isNotEmpty ? remaining.last.id : null,
-      );
-    });
-  }
-
-  void _onUpdateWindowMetadata(
-    UpdateWindowMetadataEvent event,
-    Emitter<WorkspaceState> emit,
-  ) {
-    if (!_isLoaded) return;
-    _mutateActiveTab(_loaded, emit, (tab) {
-      return tab.copyWith(
         windows: tab.windows.map((w) {
           if (w.id != event.windowId) return w;
           return w.copyWith(
-            metadata: {...w.metadata, ...event.metadata},
+            size: snapResult.size,
+            position: snapResult.position,
           );
         }).toList(),
       );
     });
   }
 
-  // ─── Layout ───────────────────────────────────────────────────────────────
-
-  void _onToggleLayoutMode(
-    ToggleLayoutModeEvent _,
+  void _onAddNewWindowToWorkspace(
+    AddNewWindowToWorkspaceEvent event,
     Emitter<WorkspaceState> emit,
   ) {
     if (!_isLoaded) return;
     final current = _loaded;
-    final tab = current.activeTab;
-    final newFreeFloating = !tab.isFreeFloating;
-    var updatedTab = tab.copyWith(isFreeFloating: newFreeFloating);
+    final maxZ = current.activeTab.windows.fold(0, (m, w) => max(m, w.zIndex));
+    final offset = (current.activeTab.windows.length * 30.0) % 200;
 
-    if (!newFreeFloating) {
-      updatedTab = _applyGridLayout(updatedTab, const Size(1440, 820));
-    }
+    final newWindow = WorkspaceWindowModel(
+      id: 'win_${_windowCounter++}',
+      type: event.type,
+      symbol: event.symbol.toUpperCase(),
+      position: Offset(40 + offset, 40 + offset),
+      size: const Size(360, 400),
+      zIndex: maxZ + 1,
+    );
 
-    final updatedTabs = List<WorkspaceTab>.from(current.tabs);
-    updatedTabs[current.activeTabIndex] = updatedTab;
-    emit(current.copyWith(tabs: updatedTabs));
+    _mutateActiveTab(
+      current,
+      emit,
+      (tab) => tab.copyWith(
+        activeWindowId: newWindow.id,
+        windows: [...tab.windows, newWindow],
+      ),
+    );
+  }
+
+  void _onRemoveWindow(RemoveWindowEvent event, Emitter<WorkspaceState> emit) {
+    if (!_isLoaded) return;
+    final current = _loaded;
+    _mutateActiveTab(current, emit, (tab) {
+      final remaining = tab.windows
+          .where((w) => w.id != event.windowId)
+          .toList();
+      return tab.copyWith(
+        windows: remaining,
+        activeWindowId: remaining.isNotEmpty ? remaining.last.id : null,
+      );
+    });
   }
 
   void _onAutoArrangeWindows(
@@ -297,7 +459,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
   ) {
     if (!_isLoaded) return;
     final current = _loaded;
-    final updatedTabs = List<WorkspaceTab>.from(current.tabs);
+    final updatedTabs = List<WorkspaceTabModel>.from(current.tabs);
     updatedTabs[current.activeTabIndex] = _applyGridLayout(
       current.activeTab.copyWith(isFreeFloating: false),
       event.canvasSize,
@@ -311,7 +473,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
   ) {
     if (!_isLoaded) return;
     final current = _loaded;
-    final updatedTabs = List<WorkspaceTab>.from(current.tabs);
+    final updatedTabs = List<WorkspaceTabModel>.from(current.tabs);
     updatedTabs[current.activeTabIndex] = _applyGridLayout(
       current.activeTab.copyWith(
         gridRows: event.rows,
@@ -325,20 +487,240 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
     emit(current.copyWith(tabs: updatedTabs));
   }
 
-  // ─── Search ───────────────────────────────────────────────────────────────
-
-  void _onFilterGlobalSearch(
-    FilterGlobalSearchEvent event,
+  void _onGlobalSearchSymbol(
+    GlobalSearchSymbolEvent event,
     Emitter<WorkspaceState> emit,
   ) {
     if (!_isLoaded) return;
-    emit(_loaded.copyWith(searchQuery: event.query));
+    final current = _loaded;
+    final sym = event.query.trim().toUpperCase();
+    if (sym.isEmpty) return;
+
+    final activeWin = current.activeWindow;
+    if (activeWin != null) {
+      _mutateActiveTab(
+        current,
+        emit,
+        (tab) => tab.copyWith(
+          windows: tab.windows.map((w) {
+            return w.id == activeWin.id ? w.copyWith(symbol: sym) : w;
+          }).toList(),
+        ),
+      );
+    }
   }
 
-  // ─── Private Helpers ──────────────────────────────────────────────────────
+  void _onCreateTemplateLayout(
+    CreateTemplateLayoutEvent event,
+    Emitter<WorkspaceState> emit,
+  ) {
+    if (!_isLoaded) return;
+    final current = _loaded;
+    final tabTitle = event.template.title;
 
-  WorkspaceTab _applyGridLayout(
-    WorkspaceTab tab,
+    final generatedWindows = <WorkspaceWindowModel>[];
+    int rows = 2;
+    int cols = 4;
+
+    switch (event.template) {
+      case WorkspaceLayoutTemplate.newLayout:
+        generatedWindows.add(
+          WorkspaceWindowModel(
+            id: 'win_${_windowCounter++}',
+            type: WorkspaceWidgetType.orderbook,
+            symbol: 'BBCA',
+            position: const Offset(8, 8),
+            size: const Size(420, 480),
+            zIndex: 0,
+          ),
+        );
+        rows = 1;
+        cols = 1;
+        break;
+
+      case WorkspaceLayoutTemplate.multiOrderbook:
+        final symbols = [
+          'BBCA',
+          'BBRI',
+          'BMRI',
+          'TLKM',
+          'ASII',
+          'BBNI',
+          'MDKA',
+          'AMMN',
+        ];
+        for (int i = 0; i < symbols.length; i++) {
+          generatedWindows.add(
+            WorkspaceWindowModel(
+              id: 'win_${_windowCounter++}',
+              type: WorkspaceWidgetType.orderbook,
+              symbol: symbols[i],
+              position: const Offset(8, 8),
+              size: const Size(320, 380),
+              zIndex: i,
+            ),
+          );
+        }
+        rows = 2;
+        cols = 4;
+        break;
+
+      case WorkspaceLayoutTemplate.multiChart:
+        final symbols = ['BBCA', 'BBRI', 'BMRI', 'TLKM'];
+        for (int i = 0; i < symbols.length; i++) {
+          generatedWindows.add(
+            WorkspaceWindowModel(
+              id: 'win_${_windowCounter++}',
+              type: WorkspaceWidgetType.chart,
+              symbol: symbols[i],
+              position: const Offset(8, 8),
+              size: const Size(540, 380),
+              zIndex: i,
+            ),
+          );
+        }
+        rows = 2;
+        cols = 2;
+        break;
+
+      case WorkspaceLayoutTemplate.classic:
+        generatedWindows.addAll([
+          WorkspaceWindowModel(
+            id: 'win_${_windowCounter++}',
+            type: WorkspaceWidgetType.watchlist,
+            symbol: 'BBCA',
+            position: const Offset(8, 8),
+            size: const Size(300, 520),
+            zIndex: 0,
+          ),
+          WorkspaceWindowModel(
+            id: 'win_${_windowCounter++}',
+            type: WorkspaceWidgetType.chart,
+            symbol: 'BBCA',
+            position: const Offset(312, 8),
+            size: const Size(560, 260),
+            zIndex: 1,
+          ),
+          WorkspaceWindowModel(
+            id: 'win_${_windowCounter++}',
+            type: WorkspaceWidgetType.orderbook,
+            symbol: 'BBCA',
+            position: const Offset(312, 272),
+            size: const Size(560, 260),
+            zIndex: 2,
+          ),
+        ]);
+        rows = 2;
+        cols = 2;
+        break;
+
+      case WorkspaceLayoutTemplate.multiStock:
+        final pairs = [
+          (WorkspaceWidgetType.orderbook, 'BBCA'),
+          (WorkspaceWidgetType.chart, 'BBCA'),
+          (WorkspaceWidgetType.orderbook, 'BBRI'),
+          (WorkspaceWidgetType.chart, 'BBRI'),
+        ];
+        for (int i = 0; i < pairs.length; i++) {
+          generatedWindows.add(
+            WorkspaceWindowModel(
+              id: 'win_${_windowCounter++}',
+              type: pairs[i].$1,
+              symbol: pairs[i].$2,
+              position: const Offset(8, 8),
+              size: const Size(400, 360),
+              zIndex: i,
+            ),
+          );
+        }
+        rows = 2;
+        cols = 2;
+        break;
+
+      case WorkspaceLayoutTemplate.singleStock:
+        generatedWindows.addAll([
+          WorkspaceWindowModel(
+            id: 'win_${_windowCounter++}',
+            type: WorkspaceWidgetType.chart,
+            symbol: 'BBCA',
+            position: const Offset(8, 8),
+            size: const Size(600, 380),
+            zIndex: 0,
+          ),
+          WorkspaceWindowModel(
+            id: 'win_${_windowCounter++}',
+            type: WorkspaceWidgetType.orderbook,
+            symbol: 'BBCA',
+            position: const Offset(612, 8),
+            size: const Size(380, 380),
+            zIndex: 1,
+          ),
+          WorkspaceWindowModel(
+            id: 'win_${_windowCounter++}',
+            type: WorkspaceWidgetType.brokerSummary,
+            symbol: 'BBCA',
+            position: const Offset(8, 392),
+            size: const Size(984, 280),
+            zIndex: 2,
+          ),
+        ]);
+        rows = 2;
+        cols = 2;
+        break;
+
+      case WorkspaceLayoutTemplate.fastOrder:
+        generatedWindows.addAll([
+          WorkspaceWindowModel(
+            id: 'win_${_windowCounter++}',
+            type: WorkspaceWidgetType.orderbook,
+            symbol: 'BBCA',
+            position: const Offset(8, 8),
+            size: const Size(450, 480),
+            zIndex: 0,
+          ),
+          WorkspaceWindowModel(
+            id: 'win_${_windowCounter++}',
+            type: WorkspaceWidgetType.orderbook,
+            symbol: 'BBRI',
+            position: const Offset(462, 8),
+            size: const Size(450, 480),
+            zIndex: 1,
+          ),
+        ]);
+        rows = 1;
+        cols = 2;
+        break;
+    }
+
+    var newTab = WorkspaceTabModel(
+      id: 'tab_${_tabCounter++}',
+      title: tabTitle,
+      windows: generatedWindows,
+      activeWindowId: generatedWindows.isNotEmpty
+          ? generatedWindows.first.id
+          : null,
+      gridRows: rows,
+      gridColumns: cols,
+      layoutMode: LayoutMode.scrollable,
+      isFreeFloating: event.template == WorkspaceLayoutTemplate.classic,
+    );
+
+    if (event.template != WorkspaceLayoutTemplate.classic &&
+        generatedWindows.isNotEmpty) {
+      newTab = _applyGridLayout(
+        newTab,
+        event.canvasSize,
+        rows: rows,
+        cols: cols,
+      );
+    }
+
+    final newTabs = [...current.tabs, newTab];
+    emit(current.copyWith(tabs: newTabs, activeTabIndex: newTabs.length - 1));
+  }
+
+  WorkspaceTabModel _applyGridLayout(
+    WorkspaceTabModel tab,
     Size canvasSize, {
     int? rows,
     int? cols,
@@ -350,21 +732,27 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
     const spacing = 4.0;
     const padding = 4.0;
 
+    final isScrollable = tab.layoutMode == LayoutMode.scrollable;
     final tileW = max(
-        280.0, (canvasSize.width - padding * 2 - spacing * (c - 1)) / c);
-    final tileH = max(
-        340.0, (canvasSize.height - padding * 2 - spacing * (r - 1)) / r);
+      280.0,
+      (canvasSize.width - padding * 2 - spacing * (c - 1)) / c,
+    );
+    final tileH = isScrollable
+        ? 380.0
+        : max(300.0, (canvasSize.height - padding * 2 - spacing * (r - 1)) / r);
 
-    final arranged = <WorkspaceWindow>[];
+    final arranged = <WorkspaceWindowModel>[];
     for (int i = 0; i < tab.windows.length; i++) {
-      arranged.add(tab.windows[i].copyWith(
-        position: Offset(
-          padding + (i % c) * (tileW + spacing),
-          padding + (i ~/ c) * (tileH + spacing),
+      arranged.add(
+        tab.windows[i].copyWith(
+          position: Offset(
+            padding + (i % c) * (tileW + spacing),
+            padding + (i ~/ c) * (tileH + spacing),
+          ),
+          size: Size(tileW, tileH),
+          zIndex: i,
         ),
-        size: Size(tileW, tileH),
-        zIndex: i,
-      ));
+      );
     }
 
     return tab.copyWith(
