@@ -5,15 +5,32 @@ import 'package:stockbit_clone2/features/orderbook/domain/entities/orderbook_win
 import 'package:stockbit_clone2/features/orderbook/presentation/bloc/orderbook_bloc.dart';
 import 'package:stockbit_clone2/features/orderbook/presentation/bloc/orderbook_event.dart';
 import 'package:stockbit_clone2/features/orderbook/presentation/bloc/orderbook_state.dart';
+import 'package:stockbit_clone2/features/orderbook/presentation/controllers/canvas_drag_controller.dart';
 import 'package:stockbit_clone2/features/orderbook/presentation/widgets/orderbook_floating_window.dart';
 
-class OrderbookCanvasWorkspace extends StatelessWidget {
+class OrderbookCanvasWorkspace extends StatefulWidget {
   const OrderbookCanvasWorkspace({super.key});
+
+  @override
+  State<OrderbookCanvasWorkspace> createState() =>
+      _OrderbookCanvasWorkspaceState();
+}
+
+class _OrderbookCanvasWorkspaceState extends State<OrderbookCanvasWorkspace> {
+  /// One controller for the whole canvas — handles drag for any window.
+  final CanvasDragController _dragController = CanvasDragController();
+
+  @override
+  void dispose() {
+    _dragController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<OrderbookBloc, OrderbookState>(
       builder: (context, state) {
+        // ── Loading ────────────────────────────────────────────────────────────
         if (state is OrderbookLoadingState) {
           return const Center(
             child: CircularProgressIndicator(
@@ -23,6 +40,7 @@ class OrderbookCanvasWorkspace extends StatelessWidget {
           );
         }
 
+        // ── Error ─────────────────────────────────────────────────────────────
         if (state is OrderbookErrorState) {
           return Center(
             child: Column(
@@ -30,16 +48,17 @@ class OrderbookCanvasWorkspace extends StatelessWidget {
               children: [
                 const Icon(Icons.error_outline, size: 36, color: AppColors.offerRed),
                 const SizedBox(height: 12),
-                Text(state.message, style: const TextStyle(color: AppColors.textSecondary)),
+                Text(state.message,
+                    style: const TextStyle(color: AppColors.textSecondary)),
                 const SizedBox(height: 16),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryGreen,
                     foregroundColor: Colors.black,
                   ),
-                  onPressed: () {
-                    context.read<OrderbookBloc>().add(const LoadMultiOrderbooksEvent());
-                  },
+                  onPressed: () => context
+                      .read<OrderbookBloc>()
+                      .add(const LoadMultiOrderbooksEvent()),
                   child: const Text('Retry'),
                 ),
               ],
@@ -47,119 +66,124 @@ class OrderbookCanvasWorkspace extends StatelessWidget {
           );
         }
 
+        // ── Canvas ────────────────────────────────────────────────────────────
         if (state is OrderbookLoadedState) {
           final activeTab = state.activeTab;
-          final windows = List<OrderbookWindowItem>.from(activeTab.windows)
+          final sortedWindows = List<OrderbookWindowItem>.from(activeTab.windows)
             ..sort((a, b) => a.zIndex.compareTo(b.zIndex));
-          final snapGuide = state.magneticSnapGuide;
 
           return LayoutBuilder(
             builder: (context, constraints) {
-              final canvasSize = Size(constraints.maxWidth, constraints.maxHeight);
+              final canvasSize =
+                  Size(constraints.maxWidth, constraints.maxHeight);
 
-              return Container(
-                width: constraints.maxWidth,
-                height: constraints.maxHeight,
-                color: AppColors.canvasBg,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    // 1. Canvas Grid blueprint background lines
-                    Positioned.fill(
-                      child: CustomPaint(
-                        painter: _GridBackgroundPainter(),
+              return Listener(
+                // ── Single GestureDetector for the whole canvas drag ──────────
+                onPointerDown: (event) {
+                  // Hit-test which window the pointer landed on (topmost first)
+                  final reversedWindows =
+                      sortedWindows.reversed.toList();
+                  for (final win in reversedWindows) {
+                    final rect = Rect.fromLTWH(
+                      win.position.dx,
+                      win.position.dy,
+                      win.size.width,
+                      win.size.height,
+                    );
+                    // Only start drag when the user presses the header strip (top 34px)
+                    final headerRect = Rect.fromLTWH(
+                      win.position.dx,
+                      win.position.dy,
+                      win.size.width,
+                      34,
+                    );
+                    if (headerRect.contains(event.localPosition)) {
+                      _dragController.startDrag(
+                          win.id, context.read<OrderbookBloc>());
+                      break;
+                    } else if (rect.contains(event.localPosition)) {
+                      // Tap elsewhere on the window just focuses it
+                      context
+                          .read<OrderbookBloc>()
+                          .add(SetActiveWindowEvent(win.id));
+                      break;
+                    }
+                  }
+                },
+                onPointerMove: (event) {
+                  _dragController.updateDrag(
+                    event.delta,
+                    canvasSize,
+                    context.read<OrderbookBloc>(),
+                  );
+                },
+                onPointerUp: (event) => _dragController.endDrag(
+                    context.read<OrderbookBloc>()),
+                onPointerCancel: (event) => _dragController.endDrag(
+                    context.read<OrderbookBloc>()),
+                child: Container(
+                  color: AppColors.canvasBg,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      // ── Blueprint grid background ───────────────────────────
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: _GridBackgroundPainter(),
+                        ),
                       ),
-                    ),
 
-                    // 2. Magnetic Snap Visual Guide (Ghost Slot Target)
-                    if (snapGuide != null)
-                      Positioned(
-                        left: snapGuide.left,
-                        top: snapGuide.top,
-                        width: snapGuide.width,
-                        height: snapGuide.height,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryGreen.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(5),
-                            border: Border.all(
-                              color: AppColors.primaryGreen.withValues(alpha: 0.6),
-                              width: 1.5,
-                              strokeAlign: BorderSide.strokeAlignCenter,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.primaryGreen.withValues(alpha: 0.2),
-                                blurRadius: 10,
-                                spreadRadius: 1,
+                      // ── Orderbook windows ───────────────────────────────────
+                      ...sortedWindows.map((win) {
+                        final isActive = win.id == activeTab.activeWindowId;
+                        return OrderbookFloatingWindow(
+                          key: ValueKey(win.id),
+                          window: win,
+                          isActive: isActive,
+                          canvasSize: canvasSize,
+                        );
+                      }),
+
+                      // ── Empty canvas hint ───────────────────────────────────
+                      if (sortedWindows.isEmpty)
+                        Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.dashboard_customize_outlined,
+                                size: 48,
+                                color: AppColors.textMuted,
+                              ),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'No Orderbook Windows on this Canvas',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primaryGreen,
+                                  foregroundColor: Colors.black,
+                                ),
+                                onPressed: () => context
+                                    .read<OrderbookBloc>()
+                                    .add(AddNewWindowToWorkspaceEvent(
+                                      symbol: 'BBRI',
+                                      canvasSize: canvasSize,
+                                    )),
+                                icon: const Icon(Icons.add, size: 16),
+                                label: const Text('Add Window'),
                               ),
                             ],
                           ),
-                          child: Center(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.flash_on, size: 14, color: AppColors.primaryGreen),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Magnetic Snap Lock',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.primaryGreen.withValues(alpha: 0.9),
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                         ),
-                      ),
-
-                    // 3. Orderbook Windows in stacking order
-                    ...windows.map((win) {
-                      final isActive = win.id == activeTab.activeWindowId;
-                      return OrderbookFloatingWindow(
-                        key: ValueKey(win.id),
-                        window: win,
-                        isActive: isActive,
-                        canvasSize: canvasSize,
-                      );
-                    }),
-
-                    if (windows.isEmpty)
-                      Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.dashboard_customize_outlined, size: 48, color: AppColors.textMuted),
-                            const SizedBox(height: 12),
-                            const Text(
-                              'No Orderbook Windows on this Canvas',
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
-                            ),
-                            const SizedBox(height: 12),
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primaryGreen,
-                                foregroundColor: Colors.black,
-                              ),
-                              onPressed: () {
-                                context.read<OrderbookBloc>().add(
-                                      AddNewWindowToWorkspaceEvent(
-                                        symbol: 'BBRI',
-                                        canvasSize: canvasSize,
-                                      ),
-                                    );
-                              },
-                              icon: const Icon(Icons.add, size: 16),
-                              label: const Text('Add Window'),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               );
             },
@@ -176,11 +200,10 @@ class _GridBackgroundPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.border.withValues(alpha: 0.15)
+      ..color = AppColors.border.withValues(alpha: 0.12)
       ..strokeWidth = 0.5;
 
     const step = 40.0;
-
     for (double x = 0; x < size.width; x += step) {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
     }
