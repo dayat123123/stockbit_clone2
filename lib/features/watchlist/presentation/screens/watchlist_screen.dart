@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stockbit_clone2/core/constants/app_colors.dart';
+import 'package:stockbit_clone2/core/di/injection_container.dart' as di;
 import 'package:stockbit_clone2/core/workspace/bloc/workspace_bloc.dart';
 import 'package:stockbit_clone2/core/workspace/bloc/workspace_event.dart';
 import 'package:stockbit_clone2/features/watchlist/domain/entities/watchlist_group.dart';
@@ -10,10 +11,35 @@ import 'package:stockbit_clone2/features/watchlist/presentation/bloc/watchlist_s
 import 'package:stockbit_clone2/features/watchlist/presentation/widgets/watchlist_stock_card.dart';
 
 /// Feature Screen: Displays Watchlist inside a modular workspace window slot.
+/// Self-contained with automatic BLoC fallback to prevent ProviderNotFoundException.
 class WatchlistScreen extends StatelessWidget {
   final String windowId;
 
   const WatchlistScreen({super.key, required this.windowId});
+
+  @override
+  Widget build(BuildContext context) {
+    return Builder(
+      builder: (ctx) {
+        try {
+          ctx.read<WatchlistBloc>();
+          return _WatchlistContent(windowId: windowId);
+        } catch (_) {
+          return BlocProvider<WatchlistBloc>(
+            create: (_) =>
+                di.sl<WatchlistBloc>()..add(const LoadWatchlistEvent()),
+            child: _WatchlistContent(windowId: windowId),
+          );
+        }
+      },
+    );
+  }
+}
+
+class _WatchlistContent extends StatelessWidget {
+  final String windowId;
+
+  const _WatchlistContent({required this.windowId});
 
   @override
   Widget build(BuildContext context) {
@@ -139,12 +165,14 @@ class WatchlistScreen extends StatelessWidget {
                             return InkWell(
                               onTap: () {
                                 context.read<WatchlistBloc>().add(SelectActiveStockEvent(stock.symbol));
-                                context.read<WorkspaceBloc>().add(
-                                      ChangeWindowSymbolEvent(
-                                        windowId: windowId,
-                                        newSymbol: stock.symbol,
-                                      ),
-                                    );
+                                try {
+                                  context.read<WorkspaceBloc>().add(
+                                        ChangeWindowSymbolEvent(
+                                          windowId: windowId,
+                                          newSymbol: stock.symbol,
+                                        ),
+                                      );
+                                } catch (_) {}
                               },
                               child: WatchlistStockCard(
                                 item: stock,

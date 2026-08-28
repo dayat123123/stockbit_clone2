@@ -6,7 +6,7 @@ class AppTheme {
   AppTheme._();
 
   static ThemeData get darkTheme {
-    final baseTextTheme = GoogleFonts.interTextTheme(
+    final baseTextTheme = GoogleFonts.plusJakartaSansTextTheme(
       ThemeData.dark().textTheme,
     );
 

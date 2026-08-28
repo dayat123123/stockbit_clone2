@@ -738,8 +738,8 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
       (canvasSize.width - padding * 2 - spacing * (c - 1)) / c,
     );
     final tileH = isScrollable
-        ? 380.0
-        : max(300.0, (canvasSize.height - padding * 2 - spacing * (r - 1)) / r);
+        ? 340.0
+        : max(340.0, (canvasSize.height - padding * 2 - spacing * (r - 1)) / r);
 
     final arranged = <WorkspaceWindowModel>[];
     for (int i = 0; i < tab.windows.length; i++) {

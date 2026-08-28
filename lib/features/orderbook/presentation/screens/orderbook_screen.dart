@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:stockbit_clone2/core/constants/app_colors.dart';
+import 'package:stockbit_clone2/core/di/injection_container.dart' as di;
 import 'package:stockbit_clone2/features/orderbook/domain/entities/stock_summary.dart';
 import 'package:stockbit_clone2/features/orderbook/presentation/bloc/orderbook_bloc.dart';
 import 'package:stockbit_clone2/features/orderbook/presentation/bloc/orderbook_event.dart';
@@ -9,31 +10,60 @@ import 'package:stockbit_clone2/features/orderbook/presentation/bloc/orderbook_s
 import 'package:stockbit_clone2/features/orderbook/presentation/widgets/orderbook_table_widget.dart';
 
 /// Feature Screen: Displays the real-time Orderbook depth & statistics for a given stock symbol.
-class OrderbookScreen extends StatefulWidget {
+/// Self-contained with automatic BLoC fallback to prevent ProviderNotFoundException across sub-windows.
+class OrderbookScreen extends StatelessWidget {
   final String symbol;
 
   const OrderbookScreen({super.key, required this.symbol});
 
   @override
-  State<OrderbookScreen> createState() => _OrderbookScreenState();
+  Widget build(BuildContext context) {
+    return Builder(
+      builder: (ctx) {
+        try {
+          ctx.read<OrderbookBloc>();
+          return _OrderbookContent(symbol: symbol);
+        } catch (_) {
+          return BlocProvider<OrderbookBloc>(
+            create: (_) =>
+                di.sl<OrderbookBloc>()..add(const LoadMultiOrderbooksEvent()),
+            child: _OrderbookContent(symbol: symbol),
+          );
+        }
+      },
+    );
+  }
 }
 
-class _OrderbookScreenState extends State<OrderbookScreen> {
+class _OrderbookContent extends StatefulWidget {
+  final String symbol;
+
+  const _OrderbookContent({required this.symbol});
+
+  @override
+  State<_OrderbookContent> createState() => _OrderbookContentState();
+}
+
+class _OrderbookContentState extends State<_OrderbookContent> {
   @override
   void initState() {
     super.initState();
-    context.read<OrderbookBloc>().add(
-      LoadOrderbookForSymbolEvent(widget.symbol),
-    );
+    try {
+      context.read<OrderbookBloc>().add(
+            LoadOrderbookForSymbolEvent(widget.symbol),
+          );
+    } catch (_) {}
   }
 
   @override
-  void didUpdateWidget(covariant OrderbookScreen oldWidget) {
+  void didUpdateWidget(covariant _OrderbookContent oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.symbol != widget.symbol) {
-      context.read<OrderbookBloc>().add(
-        LoadOrderbookForSymbolEvent(widget.symbol),
-      );
+      try {
+        context.read<OrderbookBloc>().add(
+              LoadOrderbookForSymbolEvent(widget.symbol),
+            );
+      } catch (_) {}
     }
   }
 
@@ -61,35 +91,30 @@ class _OrderbookScreenState extends State<OrderbookScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.hourglass_empty,
-                  size: 24,
-                  color: AppColors.textMuted,
-                ),
+                const Icon(Icons.hourglass_empty, color: AppColors.textMuted, size: 24),
                 const SizedBox(height: 8),
                 Text(
                   'Loading ${widget.symbol} Depth...',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textSecondary,
-                  ),
+                  style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
                 ),
                 const SizedBox(height: 8),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.cardSurface,
-                    foregroundColor: AppColors.primaryGreen,
-                    minimumSize: const Size(80, 24),
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                  ),
-                  onPressed: () {
+                InkWell(
+                  onTap: () {
                     context.read<OrderbookBloc>().add(
-                      LoadOrderbookForSymbolEvent(widget.symbol),
-                    );
+                          LoadOrderbookForSymbolEvent(widget.symbol),
+                        );
                   },
-                  child: const Text(
-                    'Fetch Data',
-                    style: TextStyle(fontSize: 10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.cardSurface,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: const Text(
+                      'Fetch Data',
+                      style: TextStyle(fontSize: 9, color: AppColors.primaryDark),
+                    ),
                   ),
                 ),
               ],
@@ -97,16 +122,17 @@ class _OrderbookScreenState extends State<OrderbookScreen> {
           );
         }
 
-        final summary = orderbook.summary;
-
         return Container(
           color: AppColors.cardBg,
           child: Column(
             children: [
-              _buildMetricsBar(summary, fmt),
+              // Stock Summary Mini Bar (ARA, ARB, Lot, Val, Avg)
+              _buildSummaryHeader(orderbook.summary, fmt),
+
+              // Interactive Orderbook Depth Table
               Expanded(
                 child: OrderbookTableWidget(
-                  symbol: summary.symbol,
+                  symbol: widget.symbol,
                   entries: orderbook.entries,
                   totalBidLot: orderbook.totalBidLot,
                   totalOfferLot: orderbook.totalOfferLot,
@@ -119,10 +145,15 @@ class _OrderbookScreenState extends State<OrderbookScreen> {
     );
   }
 
-  Widget _buildMetricsBar(StockSummary summary, NumberFormat fmt) {
+  Widget _buildSummaryHeader(StockSummary summary, NumberFormat fmt) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      color: AppColors.cardBg,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: const BoxDecoration(
+        color: AppColors.cardHeader,
+        border: Border(
+          bottom: BorderSide(color: AppColors.border, width: 0.5),
+        ),
+      ),
       child: Row(
         children: [
           Expanded(
@@ -137,7 +168,7 @@ class _OrderbookScreenState extends State<OrderbookScreen> {
           ),
           const SizedBox(width: 6),
           Expanded(
-            flex: 3,
+            flex: 4,
             child: Column(
               children: [
                 _metricRow('Prev', fmt.format(summary.prev.toInt())),

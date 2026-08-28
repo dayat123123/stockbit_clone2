@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:stockbit_clone2/core/constants/app_colors.dart';
@@ -6,6 +5,7 @@ import 'package:stockbit_clone2/core/utils/desktop_window_helper.dart';
 
 /// Sleek custom window control buttons (Minimize, Maximize/Restore, Close)
 /// designed specifically for windowless/frameless desktop applications.
+/// Automatically hides itself on Web / Mobile browsers.
 class CustomWindowCaptionButtons extends StatefulWidget {
   final bool showMaximize;
   final double height;
@@ -28,7 +28,7 @@ class _CustomWindowCaptionButtonsState extends State<CustomWindowCaptionButtons>
   @override
   void initState() {
     super.initState();
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    if (DesktopWindowHelper.isDesktop) {
       windowManager.addListener(this);
       _checkMaximizedState();
     }
@@ -36,13 +36,14 @@ class _CustomWindowCaptionButtonsState extends State<CustomWindowCaptionButtons>
 
   @override
   void dispose() {
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    if (DesktopWindowHelper.isDesktop) {
       windowManager.removeListener(this);
     }
     super.dispose();
   }
 
   Future<void> _checkMaximizedState() async {
+    if (!DesktopWindowHelper.isDesktop) return;
     try {
       final isMax = await windowManager.isMaximized();
       if (mounted) {
@@ -68,7 +69,8 @@ class _CustomWindowCaptionButtonsState extends State<CustomWindowCaptionButtons>
 
   @override
   Widget build(BuildContext context) {
-    if (!Platform.isWindows && !Platform.isLinux && !Platform.isMacOS) {
+    // Hide completely on Web / Non-Desktop
+    if (!DesktopWindowHelper.isDesktop) {
       return const SizedBox.shrink();
     }
 
@@ -88,8 +90,9 @@ class _CustomWindowCaptionButtonsState extends State<CustomWindowCaptionButtons>
         if (widget.showMaximize)
           _buildCaptionButton(
             icon: _isMaximized
-                ? Icons.filter_none_outlined // Dual overlapping squares for Restore
-                : Icons.crop_square_outlined, // Single square for Maximize
+                ? Icons
+                      .filter_none_outlined // Dual-box icon for Restore
+                : Icons.crop_square_outlined, // Single-box icon for Maximize
             tooltip: _isMaximized ? 'Restore Down' : 'Maximize',
             hoverColor: AppColors.cardSurface,
             iconColor: AppColors.textSecondary,

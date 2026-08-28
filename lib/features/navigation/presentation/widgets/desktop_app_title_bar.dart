@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:stockbit_clone2/core/constants/app_colors.dart';
+import 'package:stockbit_clone2/core/utils/desktop_window_helper.dart';
 import 'package:stockbit_clone2/core/widgets/custom_window_caption_buttons.dart';
 
 /// Topmost Frameless Window Title Bar spanning 100% full width of the desktop application.
+/// Automatically hides itself on Web / Mobile browsers.
 class DesktopAppTitleBar extends StatelessWidget {
   final bool showMaximize;
   final String title;
@@ -16,6 +18,11 @@ class DesktopAppTitleBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Hide completely on Web / Non-Desktop platforms
+    if (!DesktopWindowHelper.isDesktop) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
       height: 30,
       decoration: const BoxDecoration(

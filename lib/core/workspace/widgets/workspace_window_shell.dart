@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stockbit_clone2/core/constants/app_colors.dart';
@@ -9,10 +10,13 @@ import 'package:stockbit_clone2/core/workspace/factory/workspace_widget_factory.
 import 'package:stockbit_clone2/features/orderbook/presentation/widgets/stock_search_dialog.dart';
 import 'package:stockbit_clone2/features/trade/presentation/widgets/quick_trade_modal.dart';
 
-/// Professional modular window container supporting 8-directional multi-edge resizing,
-/// automatic magnetic snapping on resize release, subtle non-glowing active state,
-/// and responsive overflow-safe header.
-class WorkspaceWindowShell extends StatelessWidget {
+/// Ultra-high performance modular window container.
+///
+/// Performance Optimizations:
+/// - Maintains local drag & resize delta locally to prevent triggering full BLoC / canvas rebuilds during motion.
+/// - Commits the final snapped position & size to WorkspaceBloc only on [onPanEnd].
+/// - Wrapped with [RepaintBoundary] so window operations run at a silky-smooth 60/120 FPS without jank.
+class WorkspaceWindowShell extends StatefulWidget {
   final WorkspaceWindowModel window;
   final bool isActive;
   final Size canvasSize;
@@ -26,27 +30,62 @@ class WorkspaceWindowShell extends StatelessWidget {
     this.onDragGlobalPosition,
   });
 
-  static const double _minWidth = 180.0;
-  static const double _minHeight = 140.0;
+  @override
+  State<WorkspaceWindowShell> createState() => _WorkspaceWindowShellState();
+}
+
+class _WorkspaceWindowShellState extends State<WorkspaceWindowShell> {
+  static const double _minWidth = 280.0;
+  static const double _minHeight = 340.0;
   static const double _maxWidth = 1600.0;
   static const double _maxHeight = 1600.0;
   static const double _handleThickness = 6.0;
 
+  late Offset _currentPosition;
+  late Size _currentSize;
+  bool _isInteracting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentPosition = widget.window.position;
+    _currentSize = widget.window.size;
+  }
+
+  @override
+  void didUpdateWidget(covariant WorkspaceWindowShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_isInteracting) {
+      if (oldWidget.window.position != widget.window.position) {
+        _currentPosition = widget.window.position;
+      }
+      if (oldWidget.window.size != widget.window.size) {
+        _currentSize = widget.window.size;
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final type = window.type;
+    final type = widget.window.type;
 
     return AnimatedPositioned(
-      duration: const Duration(milliseconds: 140),
+      duration: _isInteracting
+          ? Duration.zero
+          : const Duration(milliseconds: 140),
       curve: Curves.easeOutCubic,
-      left: window.position.dx,
-      top: window.position.dy,
-      width: window.size.width,
-      height: window.size.height,
+      left: _currentPosition.dx,
+      top: _currentPosition.dy,
+      width: _currentSize.width,
+      height: _currentSize.height,
       child: RepaintBoundary(
         child: GestureDetector(
           onTapDown: (_) {
-            context.read<WorkspaceBloc>().add(SetActiveWindowEvent(window.id));
+            if (!widget.isActive) {
+              context.read<WorkspaceBloc>().add(
+                SetActiveWindowEvent(widget.window.id),
+              );
+            }
           },
           child: Container(
             decoration: BoxDecoration(
@@ -54,7 +93,7 @@ class WorkspaceWindowShell extends StatelessWidget {
               borderRadius: BorderRadius.circular(5),
               // Clean subtle non-glow border
               border: Border.all(
-                color: isActive
+                color: widget.isActive
                     ? AppColors.primaryDark.withValues(alpha: 0.55)
                     : AppColors.border,
                 width: 1.0,
@@ -67,29 +106,44 @@ class WorkspaceWindowShell extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Header Bar (28px - Clean Non-Glow with Responsive Layout)
+                    // Header Bar (28px - Clean Non-Glow)
                     GestureDetector(
                       onPanStart: (details) {
-                        context.read<WorkspaceBloc>().add(
-                          SetActiveWindowEvent(window.id),
+                        _isInteracting = true;
+                        if (!widget.isActive) {
+                          context.read<WorkspaceBloc>().add(
+                            SetActiveWindowEvent(widget.window.id),
+                          );
+                        }
+                        widget.onDragGlobalPosition?.call(
+                          details.globalPosition,
                         );
-                        onDragGlobalPosition?.call(details.globalPosition);
                       },
                       onPanUpdate: (details) {
-                        context.read<WorkspaceBloc>().add(
-                          MoveWindowEvent(
-                            windowId: window.id,
-                            delta: details.delta,
-                            canvasSize: canvasSize,
-                          ),
+                        setState(() {
+                          _currentPosition = Offset(
+                            max(0.0, _currentPosition.dx + details.delta.dx),
+                            max(0.0, _currentPosition.dy + details.delta.dy),
+                          );
+                        });
+                        widget.onDragGlobalPosition?.call(
+                          details.globalPosition,
                         );
-                        onDragGlobalPosition?.call(details.globalPosition);
                       },
                       onPanEnd: (_) {
+                        _isInteracting = false;
+                        // Commit position and trigger magnetic snap in BLoC
+                        context.read<WorkspaceBloc>().add(
+                          MoveWindowEvent(
+                            windowId: widget.window.id,
+                            delta: _currentPosition - widget.window.position,
+                            canvasSize: widget.canvasSize,
+                          ),
+                        );
                         context.read<WorkspaceBloc>().add(
                           SnapWindowOnReleaseEvent(
-                            windowId: window.id,
-                            canvasSize: canvasSize,
+                            windowId: widget.window.id,
+                            canvasSize: widget.canvasSize,
                           ),
                         );
                       },
@@ -97,9 +151,9 @@ class WorkspaceWindowShell extends StatelessWidget {
                         cursor: SystemMouseCursors.move,
                         child: Container(
                           height: 28,
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          padding: const EdgeInsets.only(left: 6, right: 2),
                           decoration: BoxDecoration(
-                            color: isActive
+                            color: widget.isActive
                                 ? AppColors.cardSurface
                                 : AppColors.cardHeader,
                             borderRadius: const BorderRadius.vertical(
@@ -113,174 +167,193 @@ class WorkspaceWindowShell extends StatelessWidget {
                             ),
                           ),
                           child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              // Drag Handle Icon
-                              const Icon(
-                                Icons.drag_indicator,
-                                size: 12,
-                                color: AppColors.textMuted,
-                              ),
-                              const SizedBox(width: 3),
-
-                              // Widget Type Badge
-                              Flexible(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                    vertical: 1.5,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: type.color.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(2),
-                                    border: Border.all(
-                                      color: type.color.withValues(alpha: 0.3),
-                                      width: 0.5,
+                              // Left: Indicator, Badge & Symbol
+                              Expanded(
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.drag_indicator,
+                                      size: 12,
+                                      color: AppColors.textMuted,
                                     ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        type.icon,
-                                        size: 9,
-                                        color: type.color,
+                                    const SizedBox(width: 3),
+
+                                    // Widget Type Badge
+                                    Flexible(
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                          vertical: 1.5,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: type.color.withValues(
+                                            alpha: 0.15,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            2,
+                                          ),
+                                          border: Border.all(
+                                            color: type.color.withValues(
+                                              alpha: 0.3,
+                                            ),
+                                            width: 0.5,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              type.icon,
+                                              size: 9,
+                                              color: type.color,
+                                            ),
+                                            const SizedBox(width: 3),
+                                            Flexible(
+                                              child: Text(
+                                                type.label,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: 8.5,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: type.color,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                      const SizedBox(width: 3),
-                                      Flexible(
-                                        child: Text(
-                                          type.label,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: 8.5,
-                                            fontWeight: FontWeight.bold,
-                                            color: type.color,
+                                    ),
+                                    const SizedBox(width: 4),
+
+                                    // Active Stock Symbol Badge & Edit/Reset Action
+                                    if (type.requiresSymbol) ...[
+                                      InkWell(
+                                        onTap: () => _openSymbolPicker(context),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 4,
+                                            vertical: 1.5,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.cardBg,
+                                            borderRadius: BorderRadius.circular(
+                                              2,
+                                            ),
+                                            border: Border.all(
+                                              color: AppColors.border,
+                                              width: 0.5,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                widget.window.symbol,
+                                                style: const TextStyle(
+                                                  fontSize: 9.5,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: AppColors.textPrimary,
+                                                  letterSpacing: 0.3,
+                                                ),
+                                              ),
+                                              const Icon(
+                                                Icons.arrow_drop_down,
+                                                size: 11,
+                                                color: AppColors.textMuted,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 2),
+
+                                      Tooltip(
+                                        message: 'Change or Reset Stock Symbol',
+                                        child: InkWell(
+                                          onTap: () =>
+                                              _openSymbolPicker(context),
+                                          child: const Padding(
+                                            padding: EdgeInsets.all(2),
+                                            child: Icon(
+                                              Icons.edit_outlined,
+                                              size: 10.5,
+                                              color: AppColors.textMuted,
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ],
-                                  ),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(width: 4),
 
-                              // Active Stock Symbol Badge & Edit/Reset Action
-                              if (type.requiresSymbol) ...[
-                                InkWell(
-                                  onTap: () => _openSymbolPicker(context),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 4,
-                                      vertical: 1.5,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.cardBg,
-                                      borderRadius: BorderRadius.circular(2),
-                                      border: Border.all(
-                                        color: AppColors.border,
-                                        width: 0.5,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          window.symbol,
-                                          style: const TextStyle(
-                                            fontSize: 9.5,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.textPrimary,
-                                            letterSpacing: 0.3,
+                              // Right: BUY & Close Button (Pinned at the Far Right)
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Quick BUY Button
+                                  if (type == WorkspaceWidgetType.orderbook ||
+                                      type == WorkspaceWidgetType.chart ||
+                                      type ==
+                                          WorkspaceWidgetType
+                                              .brokerSummary) ...[
+                                    InkWell(
+                                      onTap: () {
+                                        QuickTradeModal.show(
+                                          context,
+                                          symbol: widget.window.symbol,
+                                          isBuy: true,
+                                        );
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 5,
+                                          vertical: 1.5,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primaryDark,
+                                          borderRadius: BorderRadius.circular(
+                                            2,
                                           ),
                                         ),
-                                        const Icon(
-                                          Icons.arrow_drop_down,
-                                          size: 11,
-                                          color: AppColors.textMuted,
+                                        child: const Text(
+                                          'BUY',
+                                          style: TextStyle(
+                                            fontSize: 7.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black,
+                                          ),
                                         ),
-                                      ],
+                                      ),
                                     ),
-                                  ),
-                                ),
-                                const SizedBox(width: 2),
+                                    const SizedBox(width: 6),
+                                  ],
 
-                                // Reset/Change Stock Symbol Button
-                                Tooltip(
-                                  message: 'Change or Reset Stock Symbol',
-                                  child: InkWell(
-                                    onTap: () => _openSymbolPicker(context),
-                                    child: const Padding(
-                                      padding: EdgeInsets.all(2),
-                                      child: Icon(
-                                        Icons.edit_outlined,
-                                        size: 10.5,
-                                        color: AppColors.textMuted,
+                                  // Close / Delete Window Button (Firmly pinned at the far top-right end)
+                                  Tooltip(
+                                    message: 'Close window slot',
+                                    child: InkWell(
+                                      onTap: () {
+                                        context.read<WorkspaceBloc>().add(
+                                          RemoveWindowEvent(widget.window.id),
+                                        );
+                                      },
+                                      borderRadius: BorderRadius.circular(3),
+                                      child: const Padding(
+                                        padding: EdgeInsets.all(3),
+                                        child: Icon(
+                                          Icons.close,
+                                          size: 13.5,
+                                          color: AppColors.textSecondary,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 3),
-                              ],
-
-                              const Spacer(),
-
-                              // Quick BUY Button
-                              if (type == WorkspaceWidgetType.orderbook ||
-                                  type == WorkspaceWidgetType.chart ||
-                                  type ==
-                                      WorkspaceWidgetType.brokerSummary) ...[
-                                InkWell(
-                                  onTap: () {
-                                    QuickTradeModal.show(
-                                      context,
-                                      symbol: window.symbol,
-                                      isBuy: true,
-                                    );
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 5,
-                                      vertical: 1.5,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primaryDark,
-                                      borderRadius: BorderRadius.circular(2),
-                                    ),
-                                    child: const Text(
-                                      'BUY',
-                                      style: TextStyle(
-                                        fontSize: 7.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                              ],
-
-                              // Close / Delete Window Button (Firmly anchored at the far right end)
-                              Tooltip(
-                                message: 'Close window slot',
-                                child: InkWell(
-                                  onTap: () {
-                                    context.read<WorkspaceBloc>().add(
-                                      RemoveWindowEvent(window.id),
-                                    );
-                                  },
-                                  borderRadius: BorderRadius.circular(3),
-                                  child: const Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 2,
-                                      vertical: 2,
-                                    ),
-                                    child: Icon(
-                                      Icons.close,
-                                      size: 12.5,
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ),
+                                ],
                               ),
                             ],
                           ),
@@ -288,14 +361,14 @@ class WorkspaceWindowShell extends StatelessWidget {
                       ),
                     ),
 
-                    // Feature Screen Content Body (Overflow protected)
+                    // Feature Screen Content Body (RepaintBoundary protected)
                     Expanded(
                       child: ClipRect(
                         child: RepaintBoundary(
                           child: WorkspaceWidgetFactory.build(
-                            type: window.type,
-                            symbol: window.symbol,
-                            windowId: window.id,
+                            type: widget.window.type,
+                            symbol: widget.window.symbol,
+                            windowId: widget.window.id,
                           ),
                         ),
                       ),
@@ -303,7 +376,7 @@ class WorkspaceWindowShell extends StatelessWidget {
                   ],
                 ),
 
-                // ── 2. Interactive 8-Directional Resizing Handles with Snap ─
+                // ── 2. Interactive 8-Directional Resizing Handles ────────────
                 // Top Edge
                 Positioned(
                   top: 0,
@@ -313,7 +386,8 @@ class WorkspaceWindowShell extends StatelessWidget {
                   child: MouseRegion(
                     cursor: SystemMouseCursors.resizeUpDown,
                     child: GestureDetector(
-                      onPanUpdate: (d) => _handleResizeTop(context, d.delta.dy),
+                      onPanStart: (_) => _isInteracting = true,
+                      onPanUpdate: (d) => _handleResizeTop(d.delta.dy),
                       onPanEnd: (_) => _handleResizeEnd(context),
                     ),
                   ),
@@ -328,8 +402,8 @@ class WorkspaceWindowShell extends StatelessWidget {
                   child: MouseRegion(
                     cursor: SystemMouseCursors.resizeUpDown,
                     child: GestureDetector(
-                      onPanUpdate: (d) =>
-                          _handleResizeBottom(context, d.delta.dy),
+                      onPanStart: (_) => _isInteracting = true,
+                      onPanUpdate: (d) => _handleResizeBottom(d.delta.dy),
                       onPanEnd: (_) => _handleResizeEnd(context),
                     ),
                   ),
@@ -344,8 +418,8 @@ class WorkspaceWindowShell extends StatelessWidget {
                   child: MouseRegion(
                     cursor: SystemMouseCursors.resizeLeftRight,
                     child: GestureDetector(
-                      onPanUpdate: (d) =>
-                          _handleResizeLeft(context, d.delta.dx),
+                      onPanStart: (_) => _isInteracting = true,
+                      onPanUpdate: (d) => _handleResizeLeft(d.delta.dx),
                       onPanEnd: (_) => _handleResizeEnd(context),
                     ),
                   ),
@@ -360,8 +434,8 @@ class WorkspaceWindowShell extends StatelessWidget {
                   child: MouseRegion(
                     cursor: SystemMouseCursors.resizeLeftRight,
                     child: GestureDetector(
-                      onPanUpdate: (d) =>
-                          _handleResizeRight(context, d.delta.dx),
+                      onPanStart: (_) => _isInteracting = true,
+                      onPanUpdate: (d) => _handleResizeRight(d.delta.dx),
                       onPanEnd: (_) => _handleResizeEnd(context),
                     ),
                   ),
@@ -376,9 +450,10 @@ class WorkspaceWindowShell extends StatelessWidget {
                   child: MouseRegion(
                     cursor: SystemMouseCursors.resizeUpLeftDownRight,
                     child: GestureDetector(
+                      onPanStart: (_) => _isInteracting = true,
                       onPanUpdate: (d) {
-                        _handleResizeTop(context, d.delta.dy);
-                        _handleResizeLeft(context, d.delta.dx);
+                        _handleResizeTop(d.delta.dy);
+                        _handleResizeLeft(d.delta.dx);
                       },
                       onPanEnd: (_) => _handleResizeEnd(context),
                     ),
@@ -394,9 +469,10 @@ class WorkspaceWindowShell extends StatelessWidget {
                   child: MouseRegion(
                     cursor: SystemMouseCursors.resizeUpRightDownLeft,
                     child: GestureDetector(
+                      onPanStart: (_) => _isInteracting = true,
                       onPanUpdate: (d) {
-                        _handleResizeTop(context, d.delta.dy);
-                        _handleResizeRight(context, d.delta.dx);
+                        _handleResizeTop(d.delta.dy);
+                        _handleResizeRight(d.delta.dx);
                       },
                       onPanEnd: (_) => _handleResizeEnd(context),
                     ),
@@ -412,9 +488,10 @@ class WorkspaceWindowShell extends StatelessWidget {
                   child: MouseRegion(
                     cursor: SystemMouseCursors.resizeUpRightDownLeft,
                     child: GestureDetector(
+                      onPanStart: (_) => _isInteracting = true,
                       onPanUpdate: (d) {
-                        _handleResizeBottom(context, d.delta.dy);
-                        _handleResizeLeft(context, d.delta.dx);
+                        _handleResizeBottom(d.delta.dy);
+                        _handleResizeLeft(d.delta.dx);
                       },
                       onPanEnd: (_) => _handleResizeEnd(context),
                     ),
@@ -430,9 +507,10 @@ class WorkspaceWindowShell extends StatelessWidget {
                   child: MouseRegion(
                     cursor: SystemMouseCursors.resizeUpLeftDownRight,
                     child: GestureDetector(
+                      onPanStart: (_) => _isInteracting = true,
                       onPanUpdate: (d) {
-                        _handleResizeBottom(context, d.delta.dy);
-                        _handleResizeRight(context, d.delta.dx);
+                        _handleResizeBottom(d.delta.dy);
+                        _handleResizeRight(d.delta.dx);
                       },
                       onPanEnd: (_) => _handleResizeEnd(context),
                       child: Container(
@@ -455,59 +533,63 @@ class WorkspaceWindowShell extends StatelessWidget {
     );
   }
 
-  // ── Resize Handlers with Magnetic Snap ─────────────────────────────────────
+  // ── Local Smooth Resize Handlers ──────────────────────────────────────────
 
-  void _handleResizeRight(BuildContext context, double dx) {
-    final newW = (window.size.width + dx).clamp(_minWidth, _maxWidth);
-    context.read<WorkspaceBloc>().add(
-      ResizeWindowEvent(
-        windowId: window.id,
-        newSize: Size(newW, window.size.height),
-      ),
-    );
+  void _handleResizeRight(double dx) {
+    setState(() {
+      final newW = (_currentSize.width + dx).clamp(_minWidth, _maxWidth);
+      _currentSize = Size(newW, _currentSize.height);
+    });
   }
 
-  void _handleResizeBottom(BuildContext context, double dy) {
-    final newH = (window.size.height + dy).clamp(_minHeight, _maxHeight);
-    context.read<WorkspaceBloc>().add(
-      ResizeWindowEvent(
-        windowId: window.id,
-        newSize: Size(window.size.width, newH),
-      ),
-    );
+  void _handleResizeBottom(double dy) {
+    setState(() {
+      final newH = (_currentSize.height + dy).clamp(_minHeight, _maxHeight);
+      _currentSize = Size(_currentSize.width, newH);
+    });
   }
 
-  void _handleResizeLeft(BuildContext context, double dx) {
-    final potentialW = window.size.width - dx;
+  void _handleResizeLeft(double dx) {
+    final potentialW = _currentSize.width - dx;
     if (potentialW >= _minWidth && potentialW <= _maxWidth) {
-      final newX = window.position.dx + dx;
-      context.read<WorkspaceBloc>().add(
-        ResizeWindowEvent(
-          windowId: window.id,
-          newSize: Size(potentialW, window.size.height),
-          newPosition: Offset(newX, window.position.dy),
-        ),
-      );
+      setState(() {
+        _currentPosition = Offset(
+          _currentPosition.dx + dx,
+          _currentPosition.dy,
+        );
+        _currentSize = Size(potentialW, _currentSize.height);
+      });
     }
   }
 
-  void _handleResizeTop(BuildContext context, double dy) {
-    final potentialH = window.size.height - dy;
+  void _handleResizeTop(double dy) {
+    final potentialH = _currentSize.height - dy;
     if (potentialH >= _minHeight && potentialH <= _maxHeight) {
-      final newY = window.position.dy + dy;
-      context.read<WorkspaceBloc>().add(
-        ResizeWindowEvent(
-          windowId: window.id,
-          newSize: Size(window.size.width, potentialH),
-          newPosition: Offset(window.position.dx, newY),
-        ),
-      );
+      setState(() {
+        _currentPosition = Offset(
+          _currentPosition.dx,
+          _currentPosition.dy + dy,
+        );
+        _currentSize = Size(_currentSize.width, potentialH);
+      });
     }
   }
 
   void _handleResizeEnd(BuildContext context) {
+    _isInteracting = false;
+    // Commit final size and position to BLoC once on release with Magnetic Snap
     context.read<WorkspaceBloc>().add(
-      SnapResizeOnReleaseEvent(windowId: window.id, canvasSize: canvasSize),
+      ResizeWindowEvent(
+        windowId: widget.window.id,
+        newSize: _currentSize,
+        newPosition: _currentPosition,
+      ),
+    );
+    context.read<WorkspaceBloc>().add(
+      SnapResizeOnReleaseEvent(
+        windowId: widget.window.id,
+        canvasSize: widget.canvasSize,
+      ),
     );
   }
 
@@ -517,7 +599,7 @@ class WorkspaceWindowShell extends StatelessWidget {
       targetSlotIndex: 0,
       onSymbolSelected: (sym) {
         context.read<WorkspaceBloc>().add(
-          ChangeWindowSymbolEvent(windowId: window.id, newSymbol: sym),
+          ChangeWindowSymbolEvent(windowId: widget.window.id, newSymbol: sym),
         );
       },
     );
