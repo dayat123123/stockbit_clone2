@@ -1,6 +1,5 @@
 import 'package:equatable/equatable.dart';
-import 'package:stockbit_clone2/features/orderbook/domain/entities/orderbook_window_item.dart';
-import 'package:stockbit_clone2/features/orderbook/domain/entities/workspace_tab.dart';
+import 'package:stockbit_clone2/features/orderbook/domain/entities/orderbook_data.dart';
 
 abstract class OrderbookState extends Equatable {
   const OrderbookState();
@@ -17,48 +16,36 @@ class OrderbookLoadingState extends OrderbookState {
   const OrderbookLoadingState();
 }
 
+/// All orderbook data keyed by symbol.
+/// The UI reads from this map using the symbol stored in window metadata.
 class OrderbookLoadedState extends OrderbookState {
-  final List<WorkspaceTab> tabs;
-  final int activeTabIndex;
-  final String searchQuery;
+  /// Map of symbol → OrderbookData.
+  final Map<String, OrderbookData> orderbooksBySymbol;
   final DateTime lastUpdated;
 
   const OrderbookLoadedState({
-    required this.tabs,
-    this.activeTabIndex = 0,
-    this.searchQuery = '',
+    required this.orderbooksBySymbol,
     required this.lastUpdated,
   });
 
-  WorkspaceTab get activeTab {
-    if (tabs.isEmpty) {
-      return const WorkspaceTab(id: 'tab_default', title: 'Multi-orderbook', windows: []);
-    }
-    return tabs[activeTabIndex.clamp(0, tabs.length - 1)];
+  /// Get orderbook for a specific symbol.
+  OrderbookData? getBySymbol(String? symbol) {
+    if (symbol == null) return null;
+    return orderbooksBySymbol[symbol.toUpperCase()];
   }
 
-  List<OrderbookWindowItem> get windows => activeTab.windows;
-  OrderbookWindowItem? get activeWindow => activeTab.activeWindow;
-  bool get isFreeFloating => activeTab.isFreeFloating;
-  int get gridRows => activeTab.gridRows;
-  int get gridColumns => activeTab.gridColumns;
-
   OrderbookLoadedState copyWith({
-    List<WorkspaceTab>? tabs,
-    int? activeTabIndex,
-    String? searchQuery,
+    Map<String, OrderbookData>? orderbooksBySymbol,
     DateTime? lastUpdated,
   }) {
     return OrderbookLoadedState(
-      tabs: tabs ?? this.tabs,
-      activeTabIndex: activeTabIndex ?? this.activeTabIndex,
-      searchQuery: searchQuery ?? this.searchQuery,
+      orderbooksBySymbol: orderbooksBySymbol ?? this.orderbooksBySymbol,
       lastUpdated: lastUpdated ?? this.lastUpdated,
     );
   }
 
   @override
-  List<Object?> get props => [tabs, activeTabIndex, searchQuery, lastUpdated];
+  List<Object?> get props => [orderbooksBySymbol, lastUpdated];
 }
 
 class OrderbookErrorState extends OrderbookState {
