@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stockbit_clone2/core/di/injection_container.dart' as di;
 import 'package:stockbit_clone2/core/workspace/models/workspace_widget_type.dart';
-import 'package:stockbit_clone2/features/broker_summary/presentation/screens/broker_summary_screen.dart';
-import 'package:stockbit_clone2/features/chart/presentation/screens/chart_screen.dart';
-import 'package:stockbit_clone2/features/market/presentation/screens/market_screen.dart';
-import 'package:stockbit_clone2/features/orderbook/presentation/bloc/orderbook_bloc.dart';
-import 'package:stockbit_clone2/features/orderbook/presentation/bloc/orderbook_event.dart';
-import 'package:stockbit_clone2/features/orderbook/presentation/screens/orderbook_screen.dart';
-import 'package:stockbit_clone2/features/portfolio/presentation/screens/portfolio_screen.dart';
-import 'package:stockbit_clone2/features/screener/presentation/screens/screener_screen.dart';
-import 'package:stockbit_clone2/features/watchlist/presentation/bloc/watchlist_bloc.dart';
-import 'package:stockbit_clone2/features/watchlist/presentation/bloc/watchlist_event.dart';
-import 'package:stockbit_clone2/features/watchlist/presentation/screens/watchlist_screen.dart';
+import 'package:stockbit_clone2/core/blocs/orderbook/orderbook_bloc.dart';
+import 'package:stockbit_clone2/core/blocs/orderbook/orderbook_event.dart';
+import 'package:stockbit_clone2/core/blocs/watchlist/watchlist_bloc.dart';
+import 'package:stockbit_clone2/core/blocs/watchlist/watchlist_event.dart';
+import 'package:stockbit_clone2/features/broker_summary/broker_summary_screen.dart';
+import 'package:stockbit_clone2/features/chart/chart_screen.dart';
+import 'package:stockbit_clone2/features/market/market_screen.dart';
+import 'package:stockbit_clone2/features/orderbook/orderbook_screen.dart';
+import 'package:stockbit_clone2/features/portfolio/portfolio_screen.dart';
+import 'package:stockbit_clone2/features/screener/screener_screen.dart';
+import 'package:stockbit_clone2/features/watchlist/watchlist_screen.dart';
 
 /// Dynamic Factory that maps [WorkspaceWidgetType] to its respective feature screen.
 ///

@@ -10,10 +10,11 @@ import 'package:stockbit_clone2/core/workspace/models/workspace_widget_type.dart
 import 'package:stockbit_clone2/core/workspace/models/workspace_window_model.dart';
 import 'package:stockbit_clone2/core/workspace/factory/workspace_widget_factory.dart';
 import 'package:stockbit_clone2/core/workspace/utils/magnetic_snap_helper.dart';
-import 'package:stockbit_clone2/features/navigation/domain/entities/app_nav_tab.dart';
-import 'package:stockbit_clone2/features/navigation/presentation/cubit/navigation_cubit.dart';
-import 'package:stockbit_clone2/features/orderbook/presentation/widgets/stock_search_dialog.dart';
-import 'package:stockbit_clone2/features/trade/presentation/widgets/quick_trade_modal.dart';
+import 'package:stockbit_clone2/core/navigation/cubit/navigation_cubit.dart';
+import 'package:stockbit_clone2/core/navigation/models/app_nav_tab.dart';
+import 'package:stockbit_clone2/core/widgets/dialogs/stock_search_dialog.dart';
+import 'package:stockbit_clone2/core/widgets/trade/quick_trade_modal.dart';
+import 'package:stockbit_clone2/core/services/popout_window_service.dart';
 
 /// Ultra-high performance modular window container.
 ///
@@ -312,7 +313,7 @@ class _WorkspaceWindowShellState extends State<WorkspaceWindowShell> {
                                 ),
                               ),
 
-                              // Right: BUY & Close Button (Pinned at the Far Right)
+                              // Right: BUY, Pop-out & Close Button (Pinned at the Far Right)
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -357,8 +358,32 @@ class _WorkspaceWindowShellState extends State<WorkspaceWindowShell> {
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(width: 6),
+                                    const SizedBox(width: 4),
                                   ],
+
+                                  // Pop-Out / Detach Window Button
+                                  Tooltip(
+                                    message: 'Pop-out into separate window',
+                                    child: InkWell(
+                                      onTap: () {
+                                        PopOutWindowService.openPopOutWindow(
+                                          type: widget.window.type,
+                                          symbol: widget.window.symbol,
+                                          size: widget.window.size,
+                                        );
+                                      },
+                                      borderRadius: BorderRadius.circular(3),
+                                      child: const Padding(
+                                        padding: EdgeInsets.all(3),
+                                        child: Icon(
+                                          Icons.open_in_new,
+                                          size: 11.5,
+                                          color: AppColors.textMuted,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
 
                                   // Close / Delete Window Button (Firmly pinned at the far top-right end)
                                   Tooltip(

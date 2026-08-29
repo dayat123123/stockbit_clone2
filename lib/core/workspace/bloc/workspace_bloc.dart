@@ -57,82 +57,38 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
     InitializeWorkspaceEvent event,
     Emitter<WorkspaceState> emit,
   ) {
-    final tab1Windows = <WorkspaceWindowModel>[
-      WorkspaceWindowModel(
-        id: 'win_${_windowCounter++}',
-        type: WorkspaceWidgetType.orderbook,
-        symbol: 'BBCA',
-        position: const Offset(4, 4),
-        size: const Size(350, 390),
-        zIndex: 0,
-      ),
-      WorkspaceWindowModel(
-        id: 'win_${_windowCounter++}',
-        type: WorkspaceWidgetType.orderbook,
-        symbol: 'BBRI',
-        position: const Offset(358, 4),
-        size: const Size(350, 390),
-        zIndex: 1,
-      ),
-      WorkspaceWindowModel(
-        id: 'win_${_windowCounter++}',
-        type: WorkspaceWidgetType.chart,
-        symbol: 'BBCA',
-        position: const Offset(712, 4),
-        size: const Size(350, 390),
-        zIndex: 2,
-      ),
-      WorkspaceWindowModel(
-        id: 'win_${_windowCounter++}',
-        type: WorkspaceWidgetType.watchlist,
-        symbol: 'BMRI',
-        position: const Offset(1066, 4),
-        size: const Size(350, 390),
-        zIndex: 3,
-      ),
-      WorkspaceWindowModel(
-        id: 'win_${_windowCounter++}',
-        type: WorkspaceWidgetType.orderbook,
-        symbol: 'BMRI',
-        position: const Offset(4, 398),
-        size: const Size(350, 390),
-        zIndex: 4,
-      ),
-      WorkspaceWindowModel(
-        id: 'win_${_windowCounter++}',
-        type: WorkspaceWidgetType.orderbook,
-        symbol: 'TLKM',
-        position: const Offset(358, 398),
-        size: const Size(350, 390),
-        zIndex: 5,
-      ),
-      WorkspaceWindowModel(
-        id: 'win_${_windowCounter++}',
-        type: WorkspaceWidgetType.brokerSummary,
-        symbol: 'BBRI',
-        position: const Offset(712, 398),
-        size: const Size(350, 390),
-        zIndex: 6,
-      ),
-      WorkspaceWindowModel(
-        id: 'win_${_windowCounter++}',
-        type: WorkspaceWidgetType.market,
-        symbol: 'IHSG',
-        position: const Offset(1066, 398),
-        size: const Size(350, 390),
-        zIndex: 7,
-      ),
+    final symbols = [
+      'BBCA',
+      'BBRI',
+      'BMRI',
+      'TLKM',
+      'ASII',
+      'BBNI',
+      'MDKA',
+      'AMMN',
+    ];
+
+    final multiOrderbookWindows = <WorkspaceWindowModel>[
+      for (int i = 0; i < symbols.length; i++)
+        WorkspaceWindowModel(
+          id: 'win_${_windowCounter++}',
+          type: WorkspaceWidgetType.orderbook,
+          symbol: symbols[i],
+          position: Offset(4 + (i % 4) * 354.0, 4 + (i ~/ 4) * 394.0),
+          size: const Size(350, 390),
+          zIndex: i,
+        ),
     ];
 
     emit(
       WorkspaceLoadedState(
         tabs: [
           WorkspaceTabModel(
-            id: 'tab_1',
-            title: 'Fixed Terminal #1',
+            id: 'tab_multi_orderbook',
+            title: 'Multi Orderbook',
             layoutMode: LayoutMode.fixed,
-            windows: tab1Windows,
-            activeWindowId: tab1Windows.first.id,
+            windows: multiOrderbookWindows,
+            activeWindowId: multiOrderbookWindows.first.id,
             isFreeFloating: false,
             gridRows: 2,
             gridColumns: 4,

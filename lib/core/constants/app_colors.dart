@@ -17,6 +17,7 @@ class AppColors {
   static const Color canvasBg = systemGroupedBackgroundDark; // #141414
   static const Color sidebarBg = Color(0xFF111111);
   static const Color headerBg = Color(0xFF141414);
+  static const Color titleBarBg = Color(0xFF141414);
   static const Color cardBg = Color(0xFF191919);
   static const Color cardSurface = Color(0xFF1F1F1F);
   static const Color cardHeader = Color(0xFF181818);

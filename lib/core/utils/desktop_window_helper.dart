@@ -9,7 +9,7 @@ import 'package:window_manager/window_manager.dart';
 class DesktopWindowHelper {
   static const Size loginWindowSize = Size(820, 520);
   static const Size terminalMinSize = Size(960, 600);
-  static const Size terminalDefaultSize = Size(1024, 640);
+  static const Size terminalDefaultSize = Size(1280, 800);
 
   static bool get isDesktop =>
       !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
@@ -20,10 +20,9 @@ class DesktopWindowHelper {
 
     try {
       await windowManager.ensureInitialized();
-      final windowOptions = WindowOptions(
+      const windowOptions = WindowOptions(
         size: loginWindowSize,
-        minimumSize: loginWindowSize,
-        maximumSize: loginWindowSize,
+        minimumSize: Size(400, 300),
         center: true,
         backgroundColor: Colors.transparent,
         skipTaskbar: false,
@@ -31,7 +30,6 @@ class DesktopWindowHelper {
       );
 
       await windowManager.waitUntilReadyToShow(windowOptions, () async {
-        await windowManager.setResizable(false);
         await windowManager.show();
         await windowManager.focus();
       });
@@ -59,11 +57,17 @@ class DesktopWindowHelper {
     if (!isDesktop) return;
 
     try {
-      await windowManager.setMaximumSize(const Size(4096, 4096));
-      await windowManager.setMinimumSize(terminalMinSize);
       await windowManager.setResizable(true);
-      await windowManager.setSize(terminalDefaultSize);
-      await windowManager.center();
+      await windowManager.setMinimumSize(terminalMinSize);
+      await windowManager.setMaximumSize(const Size(8192, 8192));
+      final isMax = await windowManager.isMaximized();
+      if (!isMax) {
+        final curSize = await windowManager.getSize();
+        if (curSize.width <= loginWindowSize.width && curSize.height <= loginWindowSize.height) {
+          await windowManager.setSize(terminalDefaultSize);
+          await windowManager.center();
+        }
+      }
     } catch (_) {}
   }
 
@@ -81,7 +85,12 @@ class DesktopWindowHelper {
     if (!isDesktop) return;
 
     try {
-      if (await windowManager.isMaximized()) {
+      await windowManager.setResizable(true);
+      await windowManager.setMinimumSize(terminalMinSize);
+      await windowManager.setMaximumSize(const Size(8192, 8192));
+
+      final isMax = await windowManager.isMaximized();
+      if (isMax) {
         await windowManager.unmaximize();
       } else {
         await windowManager.maximize();

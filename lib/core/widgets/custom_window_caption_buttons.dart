@@ -174,6 +174,7 @@ class _CaptionHoverButtonState extends State<_CaptionHoverButton> {
         onEnter: (_) => setState(() => _isHovered = true),
         onExit: (_) => setState(() => _isHovered = false),
         child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: widget.onTap,
           child: Container(
             width: 40,

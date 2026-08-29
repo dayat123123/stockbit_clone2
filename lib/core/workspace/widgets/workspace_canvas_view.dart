@@ -8,7 +8,7 @@ import 'package:stockbit_clone2/core/workspace/bloc/workspace_event.dart';
 import 'package:stockbit_clone2/core/workspace/bloc/workspace_state.dart';
 import 'package:stockbit_clone2/core/workspace/widgets/add_widget_dialog.dart';
 import 'package:stockbit_clone2/core/workspace/widgets/workspace_window_shell.dart';
-import 'package:stockbit_clone2/features/layout/presentation/widgets/layout_template_gallery_dialog.dart';
+import 'package:stockbit_clone2/core/widgets/dialogs/layout_template_gallery_dialog.dart';
 
 /// Pure UI View for the 2D Multi-Directional Workspace Canvas (Horizontal & Vertical Scroll)
 /// with Interactive Edge Auto-Scrolling during window drag.

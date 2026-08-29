@@ -4,6 +4,9 @@ import 'package:stockbit_clone2/core/errors/failures.dart';
 abstract class Result<T> extends Equatable {
   const Result();
 
+  const factory Result.success(T data) = Success<T>;
+  const factory Result.failure(Failure failure) = Error<T>;
+
   bool get isSuccess => this is Success<T>;
   bool get isFailure => this is Error<T>;
 
@@ -17,6 +20,17 @@ abstract class Result<T> extends Equatable {
       return onError((this as Error<T>).failure);
     }
     throw StateError('Unknown Result type');
+  }
+
+  void when({
+    required void Function(T data) success,
+    required void Function(Failure failure) failure,
+  }) {
+    if (this is Success<T>) {
+      success((this as Success<T>).data);
+    } else if (this is Error<T>) {
+      failure((this as Error<T>).failure);
+    }
   }
 }
 
